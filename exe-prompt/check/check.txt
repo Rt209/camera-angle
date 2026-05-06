@@ -1,0 +1,221 @@
+task_prompt:
+  role: "你是一位資深 Python 專案審查員、影像處理工具架構師與 coding agent coordinator。"
+
+  mission: >
+    請檢視目前這個第一版專案，判斷它在以下 6 個主要 Phase 中已經完成了哪些事情、
+    哪些只是部分完成、哪些尚未完成，並輸出一份清楚的專案盤點報告。
+    這份報告的目的不是立刻重構，而是先建立現況理解，方便後續把工作分配給其他 agent 或開發任務。
+
+  main_phases:
+    recommended_phase_count: 6
+    phases:
+      - "Phase 1: Project Skeleton + CLI"
+      - "Phase 2: File Validation + Image Loading"
+      - "Phase 3: EXIF Reader + Tag Mapping"
+      - "Phase 4: Metadata Normalization + Data Model"
+      - "Phase 5: Rich Table + JSON Output"
+      - "Phase 6: Geometry Extension Layer"
+
+  project_goal_context:
+    description: >
+      本專案目標是建立一個照片 metadata 與幾何資訊分析工具。
+      第一版重點是從照片中讀取 EXIF / Metadata，例如焦距、曝光時間、光圈、ISO、白平衡、
+      設備型號、解析度等，並透過 CLI 以 Rich Table 或 JSON 輸出。
+      後續才逐步擴充 FOV、拍攝方向、仰角、深度估算等幾何分析。
+    important_boundary:
+      - "第一版不要假設 EXIF 可以直接得到深度、仰角或真實 3D 幾何。"
+      - "Phase 1 到 Phase 5 是 MVP 主線。"
+      - "Phase 6 是擴充層，允許只有 placeholder，但要清楚標示限制。"
+
+  inspection_scope:
+    please_check:
+      - "目前專案目錄結構"
+      - "main.py 或程式入口"
+      - "CLI 參數是否可用"
+      - "是否支援 --path"
+      - "是否支援 --json"
+      - "是否支援 --output"
+      - "是否有檔案存在檢查"
+      - "是否有副檔名檢查"
+      - "是否有 JPEG / HEIC / HEIF 圖片載入邏輯"
+      - "是否有 EXIF reader"
+      - "是否有 tag mapping"
+      - "是否有 metadata model 或資料結構"
+      - "是否有 value converter"
+      - "是否有 metadata normalizer"
+      - "是否有 Rich Table 輸出"
+      - "是否有 JSON 輸出"
+      - "是否有 geometry / fov / camera_model / pose_estimation 相關模組"
+      - "是否有 tests"
+      - "是否有 README 或使用說明"
+      - "是否有錯誤處理與 warning 設計"
+
+  phase_checklist:
+    phase_1_project_skeleton_cli:
+      goal: "建立可執行專案骨架與 CLI 入口"
+      expected_items:
+        - "main.py 或等效 entry point"
+        - "src/ 專案模組目錄"
+        - "requirements.txt / pyproject.toml"
+        - "README.md"
+        - "CLI parser"
+        - "可執行 python main.py --path <image_path>"
+        - "基本 help message"
+      status_rule:
+        complete: "以上大部分存在，且 CLI 可以執行"
+        partial: "有部分檔案或 CLI 雛形，但無法完整執行"
+        missing: "沒有明確入口或 CLI"
+
+    phase_2_file_validation_image_loading:
+      goal: "安全驗證並載入圖片"
+      expected_items:
+        - "檢查圖片路徑是否存在"
+        - "檢查輸入是否為檔案"
+        - "檢查副檔名是否支援"
+        - "支援 .jpg / .jpeg"
+        - "支援 .heic / .heif，或至少有明確 TODO"
+        - "封裝 file_validator.py 或等效邏輯"
+        - "封裝 image_loader.py 或等效邏輯"
+        - "清楚錯誤訊息，不直接 crash"
+      status_rule:
+        complete: "能穩定處理合法與非法圖片路徑"
+        partial: "能讀部分格式，但錯誤處理或 HEIC 支援不足"
+        missing: "沒有檔案驗證或圖片載入封裝"
+
+    phase_3_exif_reader_tag_mapping:
+      goal: "讀取 EXIF 並映射常用標籤"
+      expected_items:
+        - "EXIF reader 模組"
+        - "讀取 raw EXIF tags"
+        - "焦距 FocalLength"
+        - "曝光時間 ExposureTime"
+        - "光圈 FNumber"
+        - "ISO"
+        - "白平衡 WhiteBalance"
+        - "設備廠牌 Make"
+        - "設備型號 Model"
+        - "解析度 / Orientation"
+        - "GPS / GPSImgDirection 若存在則解析"
+        - "tag_mapper.py 或等效映射表"
+      status_rule:
+        complete: "主要攝影參數能被讀取並映射成可讀欄位"
+        partial: "只讀到部分 EXIF 或欄位仍是 raw tag"
+        missing: "沒有 EXIF 讀取能力"
+
+    phase_4_metadata_normalization_data_model:
+      goal: "將 EXIF 原始資料轉成穩定資料模型"
+      expected_items:
+        - "metadata_model.py 或 dataclass / dict schema"
+        - "value_converter.py 或等效轉換邏輯"
+        - "metadata_normalizer.py 或等效整理流程"
+        - "曝光時間格式化，例如 1/120s"
+        - "光圈格式化，例如 f/1.8"
+        - "焦距格式化，例如 24mm"
+        - "缺失值統一顯示 N/A"
+        - "資料分組：Device / Optical / Exposure / Image / GPS / Derived Geometry"
+      status_rule:
+        complete: "輸出資料結構乾淨、穩定、可供 table/json 共用"
+        partial: "有部分格式化，但資料模型分散或不一致"
+        missing: "直接輸出 raw EXIF，沒有正規化"
+
+    phase_5_rich_table_json_output:
+      goal: "提供人類可讀與機器可讀輸出"
+      expected_items:
+        - "Rich Table 或清楚的終端機表格"
+        - "JSON output"
+        - "--json 參數"
+        - "--output result.json 參數"
+        - "warnings 區塊"
+        - "錯誤訊息格式一致"
+      status_rule:
+        complete: "可輸出表格，也可輸出 JSON 檔"
+        partial: "只有表格或只有 JSON"
+        missing: "沒有結構化輸出"
+
+    phase_6_geometry_extension_layer:
+      goal: "建立幾何推導擴充層，但不硬算缺乏資料支撐的結果"
+      expected_items:
+        - "geometry/fov.py 或等效模組"
+        - "geometry/camera_model.py 或等效模組"
+        - "pose_estimation.py / depth placeholder"
+        - "FOV 計算函式，需有 focal_length + sensor_size 才可精準計算"
+        - "GPSImgDirection 方向角解析，若 EXIF 有資料才輸出"
+        - "仰角、深度估算若未實作，應明確標示 unavailable 或 TODO"
+        - "warnings 說明缺少哪些資料"
+      status_rule:
+        complete: "有清楚 geometry 層與合理限制處理"
+        partial: "有幾何模組雛形，但資料依賴或限制說明不足"
+        missing: "沒有幾何擴充層"
+
+  required_output_format:
+    format: "Markdown report in Traditional Chinese"
+    sections:
+      - title: "1. 專案總覽"
+        content:
+          - "目前專案主要功能摘要"
+          - "目前可執行指令"
+          - "目前主要入口檔案"
+      - title: "2. 目錄結構盤點"
+        content:
+          - "列出目前檔案樹"
+          - "標註每個重要檔案的職責"
+      - title: "3. 六個 Phase 完成度矩陣"
+        table_columns:
+          - "Phase"
+          - "目標"
+          - "目前狀態: Complete / Partial / Missing"
+          - "已完成內容"
+          - "缺口"
+          - "建議下一步"
+      - title: "4. 目前程式資料流"
+        content:
+          - "請用 Mermaid 畫出目前實際資料流，不要畫理想狀態"
+      - title: "5. 與目標架構的差距"
+        content:
+          - "列出目前架構與預期 6-phase 架構的差異"
+          - "指出哪些地方可能會讓後續擴充困難"
+      - title: "6. 可分配給其他 agent 的任務清單"
+        content:
+          - "把剩餘工作拆成可以分派的任務"
+          - "每個任務要包含目標、涉及檔案、驗收標準"
+      - title: "7. 風險與注意事項"
+        content:
+          - "特別指出 EXIF 無法直接提供深度、仰角、完整 3D 幾何"
+          - "指出 HEIC 支援、EXIF 缺失值、設備校準資料等風險"
+
+  output_example_for_phase_matrix:
+    table_example:
+      - phase: "Phase 1: Project Skeleton + CLI"
+        status: "Partial"
+        completed: "已有 main.py 與基本 argparse"
+        gaps: "缺少 --output，README 不完整"
+        next_step: "補齊 CLI options 與 help message"
+
+  task_assignment_format:
+    each_task_should_include:
+      - "task_id"
+      - "task_name"
+      - "assigned_area"
+      - "related_phase"
+      - "files_to_check_or_modify"
+      - "implementation_goal"
+      - "acceptance_criteria"
+      - "dependency"
+      - "risk_level"
+
+  rules:
+    - "請先檢查現有程式，不要直接重寫整個專案。"
+    - "不要假設不存在的功能已完成。"
+    - "如果某功能只有 TODO 或空殼，請標為 Partial，不要標 Complete。"
+    - "如果程式碼可以跑，請列出實際可執行指令。"
+    - "如果程式碼不能跑，請列出阻塞原因與最小修復建議。"
+    - "請優先保留現有可用設計，再提出漸進式修正。"
+    - "請用繁體中文撰寫報告。"
+    - "Mermaid 圖請反映目前實作現況，而不是理想架構。"
+
+  final_instruction: >
+    請現在開始檢視目前 repository。
+    不要急著實作新功能。
+    先輸出完整的「第一版專案現況盤點報告」，
+    並依照 6 個 Phase 判斷完成度，最後產生可分配給其他 agent 的任務清單。
+    

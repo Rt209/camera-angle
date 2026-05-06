@@ -1,0 +1,325 @@
+project_prompt:
+  role: "你是一位資深影像處理、EXIF Metadata 解析、Python CLI 工具與專案架構專家。"
+
+  project_name: "photo-metadata-geometry-analyzer"
+
+  background:
+    description: >
+      我現在要第一次建立一個影像分析專案。專案目標是從照片中讀取 EXIF / Metadata，
+      分析與整理攝影參數，例如焦距、曝光時間、光圈、ISO、白平衡、設備型號、解析度等。
+      後續希望逐步擴充到幾何分析，例如視角 FOV、相機仰角、拍攝方向、實際角度估算、
+      甚至深度與投影相關分析。
+    standards_note: >
+      EXIF 最早與 JEIDA 標準有關，但現代文件應以 JEITA / CIPA 的 Exif 規格作為主要參考。
+      系統設計時請避免只寫 JEIDA，應使用「JEIDA / JEITA / CIPA Exif standard」或
+      「Exif standard by JEITA / CIPA」這類較準確的說法。
+
+  target:
+    primary_goal: >
+      先建立一個穩定、可執行、可擴充的 Python CLI 專案，
+      能讀取 JPEG / HEIC / HEIF 圖片中的 EXIF 資訊，
+      並以終端機表格與 JSON 格式輸出結構化結果。
+    secondary_goal: >
+      預留後續幾何計算模組，例如 FOV 換算、相機模型校準、方向角、仰角、深度估算、
+      structured light 或 projection mapping 分析。
+    current_phase: "第一次建立專案，請先完成基礎架構與 MVP，不要一次做太複雜。"
+
+  skills_to_consider:
+    exif_reader_skill:
+      source: "fanyanggenai-openloom-skills-exif-reader-skill-md"
+      purpose: >
+        用於設計 EXIF 讀取流程、標籤映射、輸出格式、錯誤處理與 CLI 使用方式。
+    structured_light_skill:
+      source: "opticmystic-projectionmapanything-claude-skills-structured-light-skill-md"
+      purpose: >
+        目前不要直接實作完整 structured light，只需要在架構中預留 geometry / projection / depth 模組，
+        讓未來能擴充投影、深度、平面校正、相機姿態估算等功能。
+
+  core_features:
+    mvp_features:
+      - "支援輸入圖片路徑，例如：python main.py --path IMG.HEIC"
+      - "驗證檔案是否存在"
+      - "驗證副檔名是否支援：.jpg, .jpeg, .heic, .heif, .tif, .tiff"
+      - "讀取 EXIF / Metadata"
+      - "解析常用攝影參數"
+      - "將分數型資料轉成可讀格式，例如 1/120s、f/1.8、24mm"
+      - "終端機輸出 Rich Table"
+      - "可選擇輸出 JSON"
+      - "錯誤時顯示清楚訊息，不要直接 crash"
+
+    metadata_fields:
+      optical_parameters:
+        - "FocalLength / 焦距"
+        - "FNumber / 光圈"
+        - "LensModel / 鏡頭型號"
+        - "FocalLengthIn35mmFilm / 35mm 等效焦距"
+      exposure_parameters:
+        - "ExposureTime / 曝光時間"
+        - "ISOSpeedRatings / ISO"
+        - "ExposureBiasValue / 曝光補償"
+        - "ExposureProgram / 曝光模式"
+      image_environment:
+        - "WhiteBalance / 白平衡"
+        - "Flash / 閃光燈"
+        - "MeteringMode / 測光模式"
+        - "DateTimeOriginal / 拍攝時間"
+      device_info:
+        - "Make / 相機或手機廠牌"
+        - "Model / 設備型號"
+        - "Software / 軟體版本"
+      image_info:
+        - "ImageWidth / 影像寬度"
+        - "ImageLength / 影像高度"
+        - "XResolution / X 解析度"
+        - "YResolution / Y 解析度"
+        - "Orientation / 影像方向"
+      optional_gps:
+        - "GPSLatitude / 緯度"
+        - "GPSLongitude / 經度"
+        - "GPSAltitude / 高度"
+        - "GPSImgDirection / 拍攝方向"
+
+  architecture:
+    style: "模組化、可擴充、乾淨分層"
+    recommended_structure:
+      root:
+        - "main.py"
+        - "pyproject.toml or requirements.txt"
+        - "README.md"
+        - "src/"
+        - "tests/"
+        - "examples/"
+      src:
+        - "cli/"
+        - "io/"
+        - "metadata/"
+        - "processing/"
+        - "geometry/"
+        - "output/"
+        - "utils/"
+      modules:
+        cli:
+          purpose: "處理 argparse / click 指令輸入"
+          files:
+            - "src/cli/parser.py"
+            - "src/cli/commands.py"
+        io:
+          purpose: "處理圖片檔案讀取、格式驗證、HEIC/HEIF 支援"
+          files:
+            - "src/io/file_validator.py"
+            - "src/io/image_loader.py"
+        metadata:
+          purpose: "處理 EXIF 讀取、Tag 映射、資料正規化"
+          files:
+            - "src/metadata/exif_reader.py"
+            - "src/metadata/tag_mapper.py"
+            - "src/metadata/metadata_model.py"
+        processing:
+          purpose: "處理資料轉換，例如分數轉小數、曝光時間格式化、單位轉換"
+          files:
+            - "src/processing/value_converter.py"
+            - "src/processing/metadata_normalizer.py"
+        geometry:
+          purpose: "預留後續相機幾何、FOV、角度、深度、投影分析"
+          files:
+            - "src/geometry/fov.py"
+            - "src/geometry/camera_model.py"
+            - "src/geometry/pose_estimation.py"
+        output:
+          purpose: "處理 Rich Table、JSON 輸出、錯誤訊息"
+          files:
+            - "src/output/rich_table.py"
+            - "src/output/json_writer.py"
+        tests:
+          purpose: "建立基本單元測試"
+          files:
+            - "tests/test_file_validator.py"
+            - "tests/test_value_converter.py"
+            - "tests/test_exif_reader.py"
+
+  technical_stack:
+    language: "Python 3.10+"
+    suggested_libraries:
+      cli:
+        - "argparse or click"
+      image_metadata:
+        - "Pillow"
+        - "pillow-heif"
+        - "ExifRead"
+        - "piexif optional"
+      terminal_output:
+        - "rich"
+      testing:
+        - "pytest"
+      data_format:
+        - "json"
+        - "dataclasses or pydantic optional"
+
+  workflow:
+    steps:
+      - step: 1
+        name: "使用者輸入指令"
+        example: "python main.py --path examples/IMG_001.HEIC"
+      - step: 2
+        name: "系統驗證檔案"
+        checks:
+          - "路徑是否存在"
+          - "是否為檔案"
+          - "副檔名是否支援"
+      - step: 3
+        name: "讀取影像標頭與 EXIF"
+        detail: "JPEG 直接讀取，HEIC/HEIF 透過 pillow-heif 註冊支援"
+      - step: 4
+        name: "映射 EXIF Tag"
+        detail: "將 0x829A、0x829D、0x8827、0x920A 等常見 Tag 轉成可讀欄位"
+      - step: 5
+        name: "資料正規化"
+        examples:
+          - "曝光時間 1/120 -> 0.0083 s 並顯示為 1/120s"
+          - "FNumber 9/5 -> f/1.8"
+          - "FocalLength 24/1 -> 24mm"
+      - step: 6
+        name: "輸出結果"
+        outputs:
+          - "Rich Table"
+          - "JSON"
+      - step: 7
+        name: "預留幾何分析"
+        examples:
+          - "FOV 計算"
+          - "焦距與感光元件尺寸換算"
+          - "GPSImgDirection 轉方向角"
+          - "相機姿態估算"
+
+  important_design_constraints:
+    - "第一版不要過度設計，不要直接實作完整深度估算或 structured light。"
+    - "第一版重點是穩定讀取 EXIF、清楚輸出、乾淨架構。"
+    - "所有功能都要能在終端機執行。"
+    - "所有錯誤都要有清楚提示，例如檔案不存在、格式不支援、EXIF 不存在。"
+    - "輸出欄位要分組：設備資訊、光學參數、曝光參數、影像資訊、GPS 資訊、幾何推導。"
+    - "EXIF 缺少某欄位時不要報錯，顯示 N/A。"
+    - "HEIC/HEIF 支援要獨立封裝，避免主流程混亂。"
+    - "程式碼要有註解，但不要過度註解。"
+    - "README 要包含安裝、執行、範例輸出、專案架構說明。"
+
+  calculation_requirements:
+    fov:
+      status: "第一版可以先做基礎版本"
+      formula: "FOV = 2 * arctan(sensor_size / (2 * focal_length))"
+      caution: >
+        若沒有 sensor size，不能直接得到精準 FOV。
+        可以先根據設備型號建立 calibration profile，
+        或顯示「需要感光元件尺寸或設備校準資料」。
+    direction:
+      status: "若 EXIF 有 GPSImgDirection 才輸出"
+      caution: "沒有 GPSImgDirection 時，不可憑空推論拍攝方向。"
+    pitch_angle:
+      status: "先預留，不要硬算"
+      caution: >
+        單張照片通常無法只靠 EXIF 精準得到仰角。
+        需要 IMU、姿態資料、地平線偵測、消失點、或相機校準資訊。
+    depth:
+      status: "先預留，不要硬算"
+      caution: >
+        單張普通照片無法直接得到完整真實深度。
+        未來可考慮 monocular depth estimation、stereo、structured light、或已知物體尺寸推估。
+
+  expected_cli_examples:
+    basic:
+      command: "python main.py --path examples/IMG_001.HEIC"
+      output: "在終端機顯示 Rich Table"
+    json:
+      command: "python main.py --path examples/IMG_001.HEIC --json"
+      output: "輸出 JSON 到終端機"
+    save_json:
+      command: "python main.py --path examples/IMG_001.HEIC --json --output result.json"
+      output: "將結構化資料保存為 result.json"
+
+  expected_output_sections:
+    - "File Info"
+    - "Device Info"
+    - "Optical Parameters"
+    - "Exposure Parameters"
+    - "Image Parameters"
+    - "GPS / Direction"
+    - "Derived Geometry"
+    - "Warnings"
+
+  derived_geometry_policy:
+    rule: >
+      Derived Geometry 只能輸出「有資料支撐」的推導。
+      若缺少必要參數，請輸出 warning，不要假裝能算出精準結果。
+    examples:
+      - condition: "有 focal_length，但沒有 sensor_size"
+        output: "Cannot compute accurate FOV without sensor size or calibration profile."
+      - condition: "有 GPSImgDirection"
+        output: "可以輸出拍攝方向角"
+      - condition: "沒有 IMU / pitch / horizon detection"
+        output: "不可輸出精準仰角，只能標示 unavailable"
+
+  implementation_plan:
+    phase_1:
+      title: "建立專案骨架"
+      tasks:
+        - "建立資料夾結構"
+        - "建立 main.py"
+        - "建立 requirements.txt 或 pyproject.toml"
+        - "建立 README.md"
+    phase_2:
+      title: "完成 CLI 與檔案驗證"
+      tasks:
+        - "支援 --path"
+        - "支援 --json"
+        - "支援 --output"
+        - "錯誤處理"
+    phase_3:
+      title: "完成 EXIF 讀取"
+      tasks:
+        - "支援 JPEG"
+        - "支援 HEIC/HEIF"
+        - "讀取常見 EXIF tags"
+    phase_4:
+      title: "完成資料正規化"
+      tasks:
+        - "分數轉換"
+        - "單位格式化"
+        - "欄位分組"
+    phase_5:
+      title: "完成終端機輸出"
+      tasks:
+        - "Rich Table"
+        - "JSON output"
+    phase_6:
+      title: "建立幾何模組 placeholder"
+      tasks:
+        - "建立 fov.py"
+        - "建立 camera_model.py"
+        - "先寫清楚 TODO 與限制"
+    phase_7:
+      title: "測試與文件"
+      tasks:
+        - "建立 pytest 基本測試"
+        - "README 加上使用範例"
+        - "加入範例輸出"
+
+  response_requirements:
+    - "請先提出完整專案架構。"
+    - "請列出每個檔案的用途。"
+    - "請產生第一版可執行程式碼。"
+    - "請優先讓 CLI 可以跑起來。"
+    - "請不要一次加入太多深度學習或複雜影像演算法。"
+    - "請在 README 中清楚說明：EXIF 能提供什麼，不能提供什麼。"
+    - "請特別說明：焦距、曝光、ISO、光圈可以從 EXIF 取得，但深度、仰角、真實方向不一定能直接從 EXIF 得到。"
+    - "請用繁體中文說明架構與使用方式。"
+    - "程式碼註解可以使用英文或繁體中文，但 README 使用繁體中文。"
+
+  first_task:
+    instruction: >
+      請根據以上需求，從零開始建立此 Python 專案。
+      請先輸出：
+      1. 建議的專案目錄結構
+      2. 每個模組的職責
+      3. 安裝套件清單
+      4. 第一版 MVP 程式碼
+      5. README.md 草稿
+      6. 下一階段可以如何擴充到 FOV、仰角、方向、深度估算

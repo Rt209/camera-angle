@@ -1,0 +1,20 @@
+[project]
+name = "photo-metadata-geometry-analyzer"
+version = "0.1.0"
+description = "Python CLI for reading photo EXIF metadata and preparing geometry analysis."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "Pillow>=10.0.0",
+  "pillow-heif>=0.15.0",
+  "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

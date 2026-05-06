@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "exif-reader": {
+      "source": "FanYangGenAI/OpenLoom",
+      "sourceType": "github",
+      "skillPath": "skills/exif-reader/SKILL.md",
+      "computedHash": "b7a637f200e2382e1760f5dc4466bc0d70ca535a0a733cac63511815692bd542"
+    },
+    "structured-light-procam-calibration": {
+      "source": "OpticMystic/ProjectionMapAnything",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/structured-light/SKILL.md",
+      "computedHash": "46849d6d42246d1a881b55a6a38aab38171f98067cfd44b8e99ef70f76d224c5"
+    }
+  }
+}
