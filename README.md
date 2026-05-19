@@ -1,63 +1,65 @@
-# photo-metadata-geometry-analyzer
+# visual-pose-angle-detector
 
-這是一個第一版 Python CLI 影像 metadata 分析專案。目標是穩定讀取 JPEG / HEIC / HEIF / TIFF 圖片中的 EXIF / Metadata，整理常見攝影參數，並以終端機表格或 JSON 輸出。
+這是一個 Python CLI 專案，用來從單張圖片的影像內容中估計視覺姿態角度。
 
-本專案採用「Exif standard by JEITA / CIPA」作為現代 EXIF 規格描述脈絡；歷史上 EXIF 與 JEIDA 有關，但文件與架構命名避免只寫 JEIDA。
+目前專案進度是 **Stage 0-3：Foundation and Roll Estimation**。此階段已完成圖片輸入、前處理、邊緣偵測、直線偵測與初版 `roll` 估計。
 
-## 專案目錄結構
+目前尚未實作 `yaw` 與 `pitch`，所以輸出中這兩個欄位會是 `null`。舊版 EXIF / metadata 報告功能仍保留，可透過 `--metadata` 執行。
+
+## 目前完成範圍
+
+Stage 0-3 pipeline：
 
 ```text
-photo-metadata-geometry-analyzer/
+單張圖片
+-> 讀取圖片
+-> 前處理
+-> 邊緣偵測
+-> 直線偵測
+-> Roll estimation
+-> Rich Table / JSON / debug images
+```
+
+目前不處理：
+
+- `pitch` estimation
+- `yaw` estimation
+- horizon detection
+- vanishing point detection
+- batch validation / metrics
+- video input
+- realtime camera input
+
+## 專案結構
+
+```text
+camera-angle/
 ├─ main.py
 ├─ pyproject.toml
 ├─ requirements.txt
 ├─ README.md
 ├─ examples/
+├─ debug/
+├─ breakdown/
 ├─ src/
+│  ├─ app/
+│  │  └─ pipeline.py
 │  ├─ cli/
 │  │  ├─ parser.py
 │  │  └─ commands.py
+│  ├─ contexts/
+│  │  ├─ input/
+│  │  ├─ preprocessing/
+│  │  ├─ geometry_features/
+│  │  ├─ pose_estimation/
+│  │  └─ output/
 │  ├─ io/
-│  │  ├─ file_validator.py
-│  │  └─ image_loader.py
 │  ├─ metadata/
-│  │  ├─ exif_reader.py
-│  │  ├─ tag_mapper.py
-│  │  └─ metadata_model.py
-│  ├─ processing/
-│  │  ├─ value_converter.py
-│  │  └─ metadata_normalizer.py
-│  ├─ geometry/
-│  │  ├─ fov.py
-│  │  ├─ camera_model.py
-│  │  └─ pose_estimation.py
 │  ├─ output/
-│  │  ├─ rich_table.py
-│  │  └─ json_writer.py
-│  └─ utils/
+│  ├─ processing/
+│  └─ shared/
 └─ tests/
-   ├─ test_file_validator.py
-   ├─ test_value_converter.py
-   └─ test_exif_reader.py
 ```
-
-## 模組職責
-
-- `main.py`：CLI 入口點。
-- `src/cli/parser.py`：定義 `--path`、`--json`、`--output` 等參數。
-- `src/cli/commands.py`：串接檔案驗證、EXIF 讀取、輸出與錯誤處理。
-- `src/io/file_validator.py`：驗證路徑存在、是檔案、且副檔名支援。
-- `src/io/image_loader.py`：透過 Pillow 開啟圖片，並獨立註冊 HEIC / HEIF 支援。
-- `src/metadata/exif_reader.py`：讀取 EXIF、整理欄位分組、產生 warnings。
-- `src/metadata/tag_mapper.py`：將 EXIF tag 與 enum 數值轉成可讀文字。
-- `src/metadata/metadata_model.py`：定義結構化 metadata report。
-- `src/processing/value_converter.py`：處理分數、曝光時間、光圈、焦距與 EV 格式。
-- `src/geometry/fov.py`：提供基礎 FOV 計算函式。
-- `src/geometry/camera_model.py`：預留設備校準 profile。
-- `src/geometry/pose_estimation.py`：預留仰角與姿態估算模組。
-- `src/output/rich_table.py`：輸出 Rich Table。
-- `src/output/json_writer.py`：輸出 JSON 字串或檔案。
-- `tests/`：基本單元測試。
 
 ## 安裝
 
@@ -69,101 +71,123 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-或使用 pyproject：
+或使用 editable install：
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-## 使用方式
+## CLI 使用方式
 
-顯示 Rich Table：
-
-```bash
-python main.py --path examples/IMG_001.HEIC
-```
-
-輸出 JSON 到終端機：
+查看說明：
 
 ```bash
-python main.py --path examples/IMG_001.HEIC --json
+python main.py --help
 ```
 
-保存 JSON：
+執行 Stage 0-3 visual pose pipeline：
 
 ```bash
-python main.py --path examples/IMG_001.HEIC --json --output result.json
+python main.py --path examples/1.jpg
 ```
 
-## 輸出區塊
+輸出 JSON：
 
-- `File Info`
-- `Device Info`
-- `Optical Parameters`
-- `Exposure Parameters`
-- `Image Parameters`
-- `GPS / Direction`
-- `Derived Geometry`
-- `Warnings`
-
-EXIF 缺少的欄位會顯示 `N/A`，不會讓程式直接崩潰。
-
-## EXIF 能提供什麼
-
-EXIF 通常可以提供：
-
-- 焦距 `FocalLength`
-- 光圈 `FNumber`
-- 曝光時間 `ExposureTime`
-- ISO `ISOSpeedRatings` 或 `PhotographicSensitivity`
-- 曝光補償、曝光模式、測光模式、白平衡
-- 相機或手機廠牌、設備型號、軟體版本
-- 影像寬高、解析度、方向
-- 若拍攝設備有寫入 GPS，可能包含緯度、經度、高度與 `GPSImgDirection`
-
-## EXIF 不能保證提供什麼
-
-EXIF 不一定能直接提供：
-
-- 精準 FOV：只知道焦距仍不夠，還需要感光元件尺寸或設備校準資料。
-- 精準仰角：單張照片通常無法只靠 EXIF 得到仰角，需要 IMU、姿態資料、地平線偵測、消失點或相機校準資訊。
-- 真實拍攝方向：只有在 EXIF 真的包含 `GPSImgDirection` 時才可輸出方向角，不能憑空推論。
-- 完整真實深度：單張普通照片無法只靠 EXIF 得到深度。未來可考慮 monocular depth estimation、stereo、structured light 或已知物體尺寸推估。
-
-## 範例輸出
-
-```text
-File Info
-Field      Value
-filename   IMG_001.HEIC
-format     HEIF
-
-Optical Parameters
-Field                    Value
-FocalLength              24mm
-FNumber                  f/1.8
-LensModel                iPhone lens
-FocalLengthIn35mmFilm    26mm
-
-Derived Geometry
-Field           Value
-HorizontalFOV   N/A
-VerticalFOV     N/A
-PitchAngle      Unavailable from EXIF only
-Depth           Unavailable from a single ordinary EXIF photo
+```bash
+python main.py --path examples/1.jpg --json
 ```
 
-## 下一階段擴充方向
+將 JSON 寫入檔案：
 
-1. 建立設備校準資料庫，依 `Make` / `Model` / `LensModel` 對應 sensor size，再計算水平與垂直 FOV。
-2. 支援讀取更多廠商私有 metadata，例如 iPhone motion metadata 或 MakerNote，但需注意格式差異。
-3. 加入方向角處理：只有在 `GPSImgDirection` 存在時輸出，並可轉換為 N / NE / E 等方位文字。
-4. 加入仰角估算模組：從 IMU、地平線偵測或消失點分析取得支撐資料後再計算。
-5. 加入深度分析模組：可從 stereo、monocular depth estimation、structured light 或已知物體尺寸逐步擴充。
-6. 若未來要做投影或 structured light，可把 projector 視為 inverse camera，擴充 camera/projector intrinsics、extrinsics、depth map 與 projection mapping pipeline。
+```bash
+python main.py --path examples/1.jpg --json --output result.json
+```
+
+指定 debug 圖輸出資料夾：
+
+```bash
+python main.py --path examples/1.jpg --debug-dir debug/stage0-3
+```
+
+執行舊版 EXIF / metadata 報告：
+
+```bash
+python main.py --path examples/1.jpg --metadata
+```
+
+如果沒有提供 `--path`，程式會嘗試從 `examples/` 中尋找一張支援格式的圖片。若 `examples/` 中有多張圖片，程式會要求使用 `--path` 明確指定。
+
+## 支援圖片格式
+
+- `.jpg`
+- `.jpeg`
+- `.png`
+- `.heic`
+- `.heif`
+- `.tif`
+- `.tiff`
+
+## Stage 0-3 JSON 輸出格式
+
+Stage 0-3 的輸出欄位會固定包含：
+
+```json
+{
+  "image": "1.jpg",
+  "yaw": null,
+  "pitch": null,
+  "roll": 1.23,
+  "unit": "degree",
+  "confidence": 0.75,
+  "method": "geometry_based_partial_pose_estimation",
+  "stage": "stage_0_3_foundation_and_roll",
+  "features_used": ["edges", "lines"],
+  "debug_artifacts": {
+    "input": "debug/01_input.png",
+    "grayscale": "debug/02_grayscale.png",
+    "blurred": "debug/03_blurred.png",
+    "edges": "debug/04_edges.png",
+    "detected_lines": "debug/05_detected_lines.png",
+    "lines": "debug/06_filtered_lines.png",
+    "line_orientation_debug": "debug/07_line_orientation_debug.png",
+    "roll_candidate_lines": "debug/08_roll_candidate_lines.png",
+    "roll_orientation_histogram": "debug/09_roll_orientation_histogram.png",
+    "roll_overlay": "debug/10_roll_overlay.png"
+  },
+  "warnings": [],
+  "line_features": {
+    "detected_line_count": 12,
+    "filtered_line_count": 8,
+    "near_horizontal_count": 5,
+    "near_vertical_count": 3,
+    "lines": []
+  }
+}
+```
+
+注意：`roll` 可能是數字，也可能因為圖片缺少穩定直線而是 `null`。
+
+## Debug Images
+
+執行 visual pose pipeline 時會輸出下列 debug 圖：
+
+| Key | 檔名 | 用途 |
+| --- | --- | --- |
+| `input` | `01_input.png` | 輸入圖片 |
+| `grayscale` | `02_grayscale.png` | 灰階結果 |
+| `blurred` | `03_blurred.png` | 模糊降噪結果 |
+| `edges` | `04_edges.png` | 邊緣偵測結果 |
+| `detected_lines` | `05_detected_lines.png` | Hough 偵測到的原始線段 |
+| `lines` | `06_filtered_lines.png` | 過濾後線段 |
+| `line_orientation_debug` | `07_line_orientation_debug.png` | 線段方向分類 |
+| `roll_candidate_lines` | `08_roll_candidate_lines.png` | 用於 roll 的候選線段 |
+| `roll_orientation_histogram` | `09_roll_orientation_histogram.png` | roll 候選角度分布 |
+| `roll_overlay` | `10_roll_overlay.png` | roll 與 confidence 疊圖 |
 
 ## 測試
 
 ```bash
 pytest
 ```
+
+目前測試涵蓋檔案驗證、EXIF 讀取、數值轉換、roll estimation 與 Stage 0-3 visual pose pipeline。
