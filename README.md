@@ -1,14 +1,14 @@
 # visual-pose-angle-detector
 
-這是一個 Python CLI 專案，用來從單張圖片的影像內容中估計視覺姿態角度。
+這是一個 Python CLI 專案，用來從單張圖片的影像內容估計視覺姿態角度。
 
-目前專案進度是 **Stage 0-3：Foundation and Roll Estimation**。此階段已完成圖片輸入、前處理、邊緣偵測、直線偵測與初版 `roll` 估計。
+目前主要進度是 **Stage 4-7：Pose Integration and Debug**。預設 pipeline 會執行圖片輸入、前處理、直線偵測、horizon detection、vanishing point detection，並輸出 `yaw`、`pitch`、`roll`、confidence 與 debug images。
 
-目前尚未實作 `yaw` 與 `pitch`，所以輸出中這兩個欄位會是 `null`。舊版 EXIF / metadata 報告功能仍保留，可透過 `--metadata` 執行。
+舊版 Stage 0-3 roll-only pipeline 仍可透過 `--stage-0-3` 執行。EXIF / metadata 報告功能仍保留，可透過 `--metadata` 執行。
 
 ## 目前完成範圍
 
-Stage 0-3 pipeline：
+Stage 4-7 pipeline：
 
 ```text
 單張圖片
@@ -17,18 +17,38 @@ Stage 0-3 pipeline：
 -> 邊緣偵測
 -> 直線偵測
 -> Roll estimation
+-> Horizon detection + Pitch estimation
+-> Vanishing point detection + Yaw estimation
+-> PoseResult + confidence
 -> Rich Table / JSON / debug images
 ```
 
 目前不處理：
 
-- `pitch` estimation
-- `yaw` estimation
-- horizon detection
-- vanishing point detection
-- batch validation / metrics
+- batch validation / metrics report
 - video input
 - realtime camera input
+- deep learning-based pose estimation
+- automatic camera calibration
+
+## 測試圖片來源
+
+`examples/0.png` 是用於 Stage 4-7 regression 與 debug 流程的測試圖片，來源為 [KITTI Vision Benchmark Suite](https://www.cvlibs.net/datasets/kitti/)。
+
+KITTI 由 Karlsruhe Institute of Technology 與 Toyota Technological Institute at Chicago 建立，官方頁面說明資料集用於真實世界電腦視覺 benchmark，涵蓋 stereo、optical flow、visual odometry、3D object detection、tracking 等任務。
+
+請注意：KITTI 官方頁面標示資料集與 benchmark 採用 **Creative Commons Attribution-NonCommercial-ShareAlike 3.0** 授權。此專案中的測試圖片僅用於本地開發、除錯與非商用研究用途；若後續公開發佈或使用於研究，請依 KITTI 官方要求標註來源與引用。
+
+本專案同時保存：
+
+```text
+examples/0.png
+examples/picture_information.txt
+breakdown/06_Debug/examples_0_pose_debug_process.md
+breakdown/06_Debug/examples_0_artifacts/
+```
+
+其中 `picture_information.txt` 記錄該圖片對應的 yaw / pitch / roll 參考值，`breakdown/06_Debug/` 則保存本案例的 debug 分析流程與代表性 artifact。
 
 ## 專案結構
 
@@ -39,7 +59,6 @@ camera-angle/
 ├─ requirements.txt
 ├─ README.md
 ├─ examples/
-├─ debug/
 ├─ breakdown/
 ├─ src/
 │  ├─ app/
@@ -85,37 +104,41 @@ pip install -e ".[dev]"
 python main.py --help
 ```
 
-執行 Stage 0-3 visual pose pipeline：
+執行預設 Stage 4-7 visual pose pipeline：
 
 ```bash
-python main.py --path examples/1.jpg
+python main.py --path examples/0.png
 ```
 
 輸出 JSON：
 
 ```bash
-python main.py --path examples/1.jpg --json
+python main.py --path examples/0.png --json
 ```
 
 將 JSON 寫入檔案：
 
 ```bash
-python main.py --path examples/1.jpg --json --output result.json
+python main.py --path examples/0.png --json --output result.json
 ```
 
 指定 debug 圖輸出資料夾：
 
 ```bash
-python main.py --path examples/1.jpg --debug-dir debug/stage0-3
+python main.py --path examples/0.png --debug-dir debug/stage4-7
+```
+
+執行 Stage 0-3 roll-only pipeline：
+
+```bash
+python main.py --path examples/0.png --stage-0-3
 ```
 
 執行舊版 EXIF / metadata 報告：
 
 ```bash
-python main.py --path examples/1.jpg --metadata
+python main.py --path examples/0.png --metadata
 ```
-
-如果沒有提供 `--path`，程式會嘗試從 `examples/` 中尋找一張支援格式的圖片。若 `examples/` 中有多張圖片，程式會要求使用 `--path` 明確指定。
 
 ## 支援圖片格式
 
@@ -127,49 +150,39 @@ python main.py --path examples/1.jpg --metadata
 - `.tif`
 - `.tiff`
 
-## Stage 0-3 JSON 輸出格式
+## Stage 4-7 JSON 輸出重點
 
-Stage 0-3 的輸出欄位會固定包含：
+Stage 4-7 的輸出會包含：
 
 ```json
 {
-  "image": "1.jpg",
-  "yaw": null,
-  "pitch": null,
-  "roll": 1.23,
+  "image": "0.png",
+  "yaw": -64.8,
+  "pitch": 1.57,
+  "roll": 1.89,
   "unit": "degree",
-  "confidence": 0.75,
-  "method": "geometry_based_partial_pose_estimation",
-  "stage": "stage_0_3_foundation_and_roll",
-  "features_used": ["edges", "lines"],
-  "debug_artifacts": {
-    "input": "debug/01_input.png",
-    "grayscale": "debug/02_grayscale.png",
-    "blurred": "debug/03_blurred.png",
-    "edges": "debug/04_edges.png",
-    "detected_lines": "debug/05_detected_lines.png",
-    "lines": "debug/06_filtered_lines.png",
-    "line_orientation_debug": "debug/07_line_orientation_debug.png",
-    "roll_candidate_lines": "debug/08_roll_candidate_lines.png",
-    "roll_orientation_histogram": "debug/09_roll_orientation_histogram.png",
-    "roll_overlay": "debug/10_roll_overlay.png"
+  "confidence": 0.89,
+  "method": "geometry_based_pose_estimation",
+  "stage": "stage_4_7_pose_integration_and_debug",
+  "features_used": ["edges", "lines", "vertical_lines", "horizon", "vanishing_point"],
+  "angle_confidence": {
+    "yaw": 0.9,
+    "pitch": 0.85,
+    "roll": 0.92
   },
+  "debug_artifacts": {},
   "warnings": [],
-  "line_features": {
-    "detected_line_count": 12,
-    "filtered_line_count": 8,
-    "near_horizontal_count": 5,
-    "near_vertical_count": 3,
-    "lines": []
-  }
+  "line_features": {},
+  "horizon_features": {},
+  "vanishing_point_features": {}
 }
 ```
 
-注意：`roll` 可能是數字，也可能因為圖片缺少穩定直線而是 `null`。
+實際數值會依圖片內容與偵測結果而變動。若某個角度無法估計，該欄位會是 `null`，對應的 confidence 會是 `0.0`，並在 `warnings` 中說明原因。
 
 ## Debug Images
 
-執行 visual pose pipeline 時會輸出下列 debug 圖：
+預設 pipeline 會產生下列 debug 圖：
 
 | Key | 檔名 | 用途 |
 | --- | --- | --- |
@@ -182,7 +195,17 @@ Stage 0-3 的輸出欄位會固定包含：
 | `line_orientation_debug` | `07_line_orientation_debug.png` | 線段方向分類 |
 | `roll_candidate_lines` | `08_roll_candidate_lines.png` | 用於 roll 的候選線段 |
 | `roll_orientation_histogram` | `09_roll_orientation_histogram.png` | roll 候選角度分布 |
-| `roll_overlay` | `10_roll_overlay.png` | roll 與 confidence 疊圖 |
+| `roll_overlay` | `10_roll_overlay.png` | roll 估計結果 |
+| `horizon_candidates` | `11_horizon_candidates.png` | horizon 候選線 |
+| `horizon` | `12_selected_horizon.png` | selected horizon |
+| `pitch_overlay` | `13_pitch_overlay.png` | pitch 估計結果 |
+| `perspective_lines` | `14_perspective_lines.png` | 用於 vanishing point 的線段 |
+| `vanishing_point_candidates` | `15_vanishing_point_candidates.png` | vanishing point 候選交點 |
+| `vanishing_point` | `16_selected_vanishing_point.png` | selected vanishing point |
+| `yaw_overlay` | `17_yaw_overlay.png` | yaw 估計結果 |
+| `pose_overlay` | `18_pose_overlay.png` | yaw / pitch / roll 最終疊圖 |
+
+根目錄 `debug/` 是本機執行產物，已被 `.gitignore` 忽略。若需要保留代表性 debug 結果，請放在 `breakdown/06_Debug/` 並搭配分析文件說明。
 
 ## 測試
 
@@ -190,4 +213,4 @@ Stage 0-3 的輸出欄位會固定包含：
 pytest
 ```
 
-目前測試涵蓋檔案驗證、EXIF 讀取、數值轉換、roll estimation 與 Stage 0-3 visual pose pipeline。
+目前測試涵蓋檔案驗證、EXIF 讀取、數值轉換、roll estimation、Stage 0-3 pipeline 與 Stage 4-7 pose integration pipeline。
