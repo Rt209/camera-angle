@@ -15,13 +15,22 @@ def print_pose_report(data: dict[str, Any]) -> None:
         pose_table.add_row(field, _display(data.get(field)))
     console.print(pose_table)
 
-    feature_table = Table(title="Stage 0-3 Features", show_header=True, header_style="bold cyan")
+    confidence_table = Table(title="Angle Confidence", show_header=True, header_style="bold cyan")
+    confidence_table.add_column("Angle", style="bold")
+    confidence_table.add_column("Confidence")
+    for key, value in data.get("angle_confidence", {}).items():
+        confidence_table.add_row(key, _display(value))
+    if data.get("angle_confidence"):
+        console.print(confidence_table)
+
+    feature_table = Table(title="Geometry Features", show_header=True, header_style="bold cyan")
     feature_table.add_column("Field", style="bold")
     feature_table.add_column("Value")
     feature_table.add_row("features_used", ", ".join(data.get("features_used", [])))
-    for key, value in data.get("line_features", {}).items():
-        if key != "lines":
-            feature_table.add_row(key, _display(value))
+    for section_name in ["line_features", "horizon_features", "vanishing_point_features"]:
+        for key, value in data.get(section_name, {}).items():
+            if key not in {"lines", "selected_horizon", "selected_vanishing_point"}:
+                feature_table.add_row(f"{section_name}.{key}", _display(value))
     console.print(feature_table)
 
     debug_table = Table(title="Debug Artifacts", show_header=True, header_style="bold cyan")
@@ -47,4 +56,3 @@ def _display(value: Any) -> str:
     if value is None or value == "":
         return "N/A"
     return str(value)
-

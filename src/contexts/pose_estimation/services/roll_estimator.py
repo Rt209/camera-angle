@@ -31,8 +31,9 @@ def estimate_roll(feature_set: LineFeatureSet) -> RollEstimate:
         )
 
     confidence = _confidence(candidates, weights, roll)
+    camera_roll = -roll
     return RollEstimate(
-        roll=round(roll, 2),
+        roll=round(camera_roll, 2),
         confidence=round(confidence, 2),
         unit="degree",
         method="line_orientation_based_roll_estimation",
@@ -67,4 +68,3 @@ def _confidence(candidates: list[float], weights: list[float], roll: float) -> f
     weighted_spread = sum(abs(angle - roll) * weight for angle, weight in zip(candidates, weights)) / total_weight
     concentration_score = clamp(1.0 - (weighted_spread / 20.0), 0.0, 1.0)
     return clamp((0.35 * count_score) + (0.25 * length_score) + (0.40 * concentration_score), 0.0, 1.0)
-

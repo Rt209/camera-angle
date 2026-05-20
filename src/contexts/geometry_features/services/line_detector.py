@@ -16,7 +16,7 @@ class LineDetectionConfig:
     threshold: int = 50
     min_line_length: int = 60
     max_line_gap: int = 10
-    horizontal_threshold_deg: float = 20.0
+    horizontal_threshold_deg: float = 8.0
     vertical_threshold_deg: float = 20.0
 
 
@@ -47,4 +47,3 @@ def detect_lines(edge_map: EdgeMap, config: LineDetectionConfig) -> LineFeatureS
 
     filtered = [line for line in detected if line.length >= config.min_line_length]
     return LineFeatureSet(detected_lines=detected, filtered_lines=filtered)
-

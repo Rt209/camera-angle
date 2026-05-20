@@ -5,7 +5,7 @@ from pathlib import Path
 from rich.console import Console
 
 from src.cli.parser import build_parser
-from src.app.pipeline import run_visual_pose_pipeline
+from src.app.pipeline import run_stage_4_7_pose_pipeline, run_visual_pose_pipeline
 from src.contexts.output.services.rich_table_writer import print_pose_report
 from src.io.file_validator import FileValidationError, resolve_image_path
 from src.metadata.exif_reader import ExifReadError, read_metadata
@@ -24,8 +24,11 @@ def main() -> int:
         if args.metadata:
             report = read_metadata(image_path)
             data = report.to_dict()
-        else:
+        elif args.stage_0_3:
             result = run_visual_pose_pipeline(image_path, Path(args.debug_dir))
+            data = result.to_dict()
+        else:
+            result = run_stage_4_7_pose_pipeline(image_path, Path(args.debug_dir))
             data = result.to_dict()
 
         if args.output and not args.json:

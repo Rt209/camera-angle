@@ -14,6 +14,7 @@ class PoseResult:
     method: str
     stage: str
     features_used: list[str]
+    angle_confidence: dict[str, float] = field(default_factory=dict)
     debug_artifacts: dict[str, str] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
 
@@ -28,7 +29,7 @@ class PoseResult:
             "method": self.method,
             "stage": self.stage,
             "features_used": self.features_used,
+            "angle_confidence": self.angle_confidence,
             "debug_artifacts": self.debug_artifacts,
             "warnings": self.warnings,
         }
-

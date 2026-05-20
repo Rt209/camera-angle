@@ -11,7 +11,7 @@ def test_estimate_roll_from_near_horizontal_lines() -> None:
     estimate = estimate_roll(LineFeatureSet(detected_lines=lines, filtered_lines=lines))
 
     assert estimate.roll is not None
-    assert 2.0 <= estimate.roll <= 4.0
+    assert -4.0 <= estimate.roll <= -2.0
     assert estimate.confidence > 0
 
 
@@ -23,4 +23,3 @@ def test_estimate_roll_returns_none_without_candidates() -> None:
 
     assert estimate.roll is None
     assert estimate.confidence == 0.0
-

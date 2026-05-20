@@ -31,6 +31,7 @@ result.json
 output.json
 reports/
 outputs/
+debug/
 
 # IDE and editor files
 .idea/

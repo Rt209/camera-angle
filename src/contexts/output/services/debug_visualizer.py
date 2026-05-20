@@ -7,7 +7,10 @@ import numpy as np
 
 from src.contexts.geometry_features.domain.line_feature_set import LineFeatureSet
 from src.contexts.geometry_features.domain.line_segment import LineSegment
+from src.contexts.geometry_features.domain.horizon_feature_set import HorizonFeatureSet
+from src.contexts.geometry_features.domain.vanishing_point_feature_set import VanishingPointFeatureSet
 from src.contexts.pose_estimation.domain.roll_estimate import RollEstimate
+from src.contexts.pose_estimation.domain.pose_result import PoseResult
 from src.contexts.pose_estimation.services.roll_estimator import candidate_lines
 from src.contexts.preprocessing.domain.edge_map import EdgeMap
 from src.contexts.preprocessing.domain.preprocessed_frame import PreprocessedFrame
@@ -81,11 +84,119 @@ def write_roll_debug(
     return _string_paths(paths)
 
 
+def write_horizon_debug(
+    debug_dir: Path,
+    frame: PreprocessedFrame,
+    horizon_features: HorizonFeatureSet,
+    pitch_value: float | None,
+) -> dict[str, str]:
+    debug_dir.mkdir(parents=True, exist_ok=True)
+    candidates_image = _draw_lines(frame.image_bgr, horizon_features.candidates, (0, 200, 255))
+    selected_image = frame.image_bgr.copy()
+    if horizon_features.selected_horizon is not None:
+        horizon = horizon_features.selected_horizon
+        cv2.line(selected_image, (horizon.x1, horizon.y1), (horizon.x2, horizon.y2), (0, 255, 0), 3)
+    overlay = selected_image.copy()
+    center_y = frame.height // 2
+    cv2.line(overlay, (0, center_y), (frame.width - 1, center_y), (255, 0, 0), 1)
+    pitch_label = f"pitch: {pitch_value if pitch_value is not None else 'N/A'} deg"
+    cv2.putText(overlay, pitch_label, (24, 72), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 0), 2, cv2.LINE_AA)
+
+    paths = {
+        "horizon_candidates": debug_dir / "11_horizon_candidates.png",
+        "horizon": debug_dir / "12_selected_horizon.png",
+        "pitch_overlay": debug_dir / "13_pitch_overlay.png",
+    }
+    cv2.imwrite(str(paths["horizon_candidates"]), candidates_image)
+    cv2.imwrite(str(paths["horizon"]), selected_image)
+    cv2.imwrite(str(paths["pitch_overlay"]), overlay)
+    return _string_paths(paths)
+
+
+def write_vanishing_point_debug(
+    debug_dir: Path,
+    frame: PreprocessedFrame,
+    vanishing_point_features: VanishingPointFeatureSet,
+    yaw_value: float | None,
+) -> dict[str, str]:
+    debug_dir.mkdir(parents=True, exist_ok=True)
+    perspective_image = _draw_lines(frame.image_bgr, vanishing_point_features.perspective_lines, (0, 165, 255))
+    candidates_image = perspective_image.copy()
+    for x, y in vanishing_point_features.candidate_points[:200]:
+        if -frame.width <= x <= frame.width * 2 and -frame.height <= y <= frame.height * 2:
+            cv2.circle(candidates_image, (int(round(x)), int(round(y))), 2, (255, 0, 255), -1)
+
+    selected_image = perspective_image.copy()
+    if vanishing_point_features.selected_vanishing_point is not None:
+        point = vanishing_point_features.selected_vanishing_point
+        _draw_cross(selected_image, int(round(point.x)), int(round(point.y)), (0, 255, 0))
+
+    overlay = selected_image.copy()
+    center_x = frame.width // 2
+    cv2.line(overlay, (center_x, 0), (center_x, frame.height - 1), (255, 0, 0), 1)
+    yaw_label = f"yaw: {yaw_value if yaw_value is not None else 'N/A'} deg"
+    cv2.putText(overlay, yaw_label, (24, 104), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (0, 255, 0), 2, cv2.LINE_AA)
+
+    paths = {
+        "perspective_lines": debug_dir / "14_perspective_lines.png",
+        "vanishing_point_candidates": debug_dir / "15_vanishing_point_candidates.png",
+        "vanishing_point": debug_dir / "16_selected_vanishing_point.png",
+        "yaw_overlay": debug_dir / "17_yaw_overlay.png",
+    }
+    cv2.imwrite(str(paths["perspective_lines"]), perspective_image)
+    cv2.imwrite(str(paths["vanishing_point_candidates"]), candidates_image)
+    cv2.imwrite(str(paths["vanishing_point"]), selected_image)
+    cv2.imwrite(str(paths["yaw_overlay"]), overlay)
+    return _string_paths(paths)
+
+
+def write_pose_overlay(
+    debug_dir: Path,
+    frame: PreprocessedFrame,
+    horizon_features: HorizonFeatureSet,
+    vanishing_point_features: VanishingPointFeatureSet,
+    pose_result: PoseResult,
+) -> dict[str, str]:
+    debug_dir.mkdir(parents=True, exist_ok=True)
+    overlay = frame.image_bgr.copy()
+    if horizon_features.selected_horizon is not None:
+        horizon = horizon_features.selected_horizon
+        cv2.line(overlay, (horizon.x1, horizon.y1), (horizon.x2, horizon.y2), (0, 255, 0), 3)
+    if vanishing_point_features.selected_vanishing_point is not None:
+        point = vanishing_point_features.selected_vanishing_point
+        _draw_cross(overlay, int(round(point.x)), int(round(point.y)), (0, 255, 255))
+
+    lines = [
+        f"yaw: {_display_angle(pose_result.yaw)}",
+        f"pitch: {_display_angle(pose_result.pitch)}",
+        f"roll: {_display_angle(pose_result.roll)}",
+        f"confidence: {pose_result.confidence:.2f}",
+    ]
+    for index, text in enumerate(lines):
+        cv2.putText(overlay, text, (24, 34 + index * 28), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (20, 20, 20), 4, cv2.LINE_AA)
+        cv2.putText(overlay, text, (24, 34 + index * 28), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+
+    paths = {"pose_overlay": debug_dir / "18_pose_overlay.png"}
+    cv2.imwrite(str(paths["pose_overlay"]), overlay)
+    return _string_paths(paths)
+
+
 def _draw_lines(image: np.ndarray, lines: list[LineSegment], color: tuple[int, int, int]) -> np.ndarray:
     output = image.copy()
     for line in lines:
         cv2.line(output, (line.x1, line.y1), (line.x2, line.y2), color, 2)
     return output
+
+
+def _draw_cross(image: np.ndarray, x: int, y: int, color: tuple[int, int, int]) -> None:
+    cv2.line(image, (x - 12, y), (x + 12, y), color, 2)
+    cv2.line(image, (x, y - 12), (x, y + 12), color, 2)
+
+
+def _display_angle(value: float | None) -> str:
+    if value is None:
+        return "N/A"
+    return f"{value:.2f} deg"
 
 
 def _orientation_color(orientation: str) -> tuple[int, int, int]:
@@ -130,4 +241,3 @@ def _orientation_histogram(lines: list[LineSegment]) -> np.ndarray:
 
 def _string_paths(paths: dict[str, Path]) -> dict[str, str]:
     return {key: str(path) for key, path in paths.items()}
-

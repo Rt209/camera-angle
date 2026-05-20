@@ -524,37 +524,105 @@ Debug images：
 # 10. 給 LM Coding Agent 的實作提示
 
 ```yaml
+role: Python OpenCV / Computer Vision coding agent
+
 task_name: implement_stage_4_7_pose_integration_and_debug
-role: Python OpenCV 工程師
-goal: >
-  在 Stage 0–3 的基礎上，新增 horizon detection、pitch estimation、
-  vanishing point detection、yaw estimation，並整合 PoseResult、confidence scoring
-  與 debug output。
-scope:
-  include:
-    - horizon candidate generation
-    - pitch estimation
-    - vanishing point candidate generation
-    - yaw estimation
-    - PoseResult 統一資料結構
-    - per-angle confidence scoring
-    - JSON / Rich Table output
-    - debug visualization
-  exclude:
-    - video input
-    - realtime camera input
-    - deep learning model
-    - full benchmark evaluation
-bounded_contexts:
-  - Geometry Feature Context
-  - Pose Estimation Context
-  - Output Context
-acceptance_criteria:
-  - 系統可輸出 yaw / pitch / roll
-  - 每個角度都有獨立 confidence
-  - 部分角度估計失敗時，其他角度仍可輸出
-  - debug images 能顯示 horizon、vanishing point、pose overlay
-  - JSON 與 Rich Table 輸出格式穩定
+
+請根據目前專案 `C:\Users\GIGABYTE\camera-angle` 實作 Stage 4-7：Pose Integration and Debug。
+
+你必須先閱讀並遵守以下文件規範：
+
+1. `breakdown/00_Overview/breakdown_architecture_principles.md`
+2. `breakdown/00_Overview/project_breakdown_overview.md`
+3. `breakdown/03_Design/bounded_context_map.md`
+4. `breakdown/03_Design/system_design_breakdown.md`
+5. `breakdown/04_Implementation/stage_0_3_foundation_and_roll.md`
+6. `breakdown/04_Implementation/stage_4_7_pose_integration_and_debug.md`
+7. `breakdown/05_Verification/verification_plan.md`
+
+也請參考目前已完成的 Stage 0-3 程式碼：
+
+- `src/app/pipeline.py`
+- `src/contexts/input/`
+- `src/contexts/preprocessing/`
+- `src/contexts/geometry_features/`
+- `src/contexts/pose_estimation/`
+- `src/contexts/output/`
+- `tests/test_visual_pose_pipeline.py`
+- `tests/test_roll_estimator.py`
+
+可以使用 `agents/skills/opencv` 輔助電腦視覺實作。請優先使用 OpenCV / NumPy，不要加入 deep learning，不要做 video / realtime camera，不要進入 Stage 8-10。
+
+目前專案狀態：
+
+- Stage 0-3 已完成：
+  - 單張圖片載入
+  - preprocessing
+  - edge detection
+  - line detection
+  - roll estimation
+  - Stage 0-3 debug images
+  - JSON / Rich Table output
+- 目前 `yaw` 與 `pitch` 仍是 `None`
+- 現有測試已鎖定 Stage 0-3 JSON 格式與 debug artifacts
+- 請保留 Stage 0-3 行為，不要破壞既有測試
+
+本次目標：
+
+實作 Stage 4-7，在 Stage 0-3 的基礎上新增：
+
+1. Stage 4：Horizon Detection + Pitch Estimation
+2. Stage 5：Vanishing Point Detection + Yaw Estimation
+3. Stage 6：PoseResult + Confidence Scoring
+4. Stage 7：Debug Visualization + Output Layer
+
+實作範圍：
+
+A. Geometry Feature Context
+
+新增 domain / service，建議包含：
+
+- `HorizonLine`
+- `VanishingPoint`
+- `HorizonFeatureSet` 或等價結構
+- `VanishingPointFeatureSet` 或等價結構
+- `horizon_detector.py`
+- `vanishing_point_detector.py`
+
+Horizon detection 初版策略：
+
+- 使用 Stage 0-3 已偵測出的 `LineSegment`
+- 從 `near_horizontal_lines` 產生 horizon candidates
+- 可先使用 dominant / weighted horizontal line selection
+- 計算 horizon quality / confidence
+- 若候選線不足，回傳 `None`，不得 crash
+
+Vanishing point detection 初版策略：
+
+- 使用 filtered lines 中的 diagonal / perspective lines
+- 做 pairwise line intersection
+- 排除平行或近乎平行的線
+- 排除明顯不合理 intersection
+- 使用 voting / clustering / median selection 找 dominant vanishing point
+- 若候選不足，回傳 `None`，不得 crash
+
+B. Pose Estimation Context
+
+新增 domain / service，建議包含：
+
+- `PitchEstimate`
+- `YawEstimate`
+- `pitch_estimator.py`
+- `yaw_estimator.py`
+- `pose_confidence.py` 或等價檔案
+
+Pitch 初版公式：
+
+```text
+pitch = atan((center_y - horizon_y) / focal_length_pixels)
+focal_length_pixels = image_width / 2
+unit = degree
+```
 ```
 
 ---
