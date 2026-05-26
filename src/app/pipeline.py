@@ -128,10 +128,28 @@ def run_stage_4_7_pose_pipeline(
     horizon_config: HorizonDetectionConfig | None = None,
     vanishing_point_config: VanishingPointDetectionConfig | None = None,
 ) -> PoseIntegrationPipelineResult:
+    frame = load_frame(image_path)
+    return run_stage_4_7_pose_pipeline_on_frame(
+        frame,
+        debug_dir,
+        preprocess_config=preprocess_config,
+        line_config=line_config,
+        horizon_config=horizon_config,
+        vanishing_point_config=vanishing_point_config,
+    )
+
+
+def run_stage_4_7_pose_pipeline_on_frame(
+    frame: Frame,
+    debug_dir: Path,
+    preprocess_config: PreprocessConfig | None = None,
+    line_config: LineDetectionConfig | None = None,
+    horizon_config: HorizonDetectionConfig | None = None,
+    vanishing_point_config: VanishingPointDetectionConfig | None = None,
+) -> PoseIntegrationPipelineResult:
     preprocess_config = preprocess_config or PreprocessConfig()
     line_config = line_config or LineDetectionConfig()
 
-    frame = load_frame(image_path)
     preprocessed = preprocess_frame(frame, preprocess_config)
     edge_map = detect_edges(preprocessed, preprocess_config)
     line_features = detect_lines(edge_map, line_config)

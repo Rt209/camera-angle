@@ -28,6 +28,20 @@ def load_frame(path: Path) -> Frame:
     )
 
 
+def frame_from_bgr(image_bgr: np.ndarray, name: str, metadata: dict[str, object] | None = None) -> Frame:
+    if image_bgr is None or image_bgr.ndim != 3 or image_bgr.shape[2] != 3:
+        raise ImageLoadError("Expected a BGR color frame with shape (height, width, 3).")
+
+    height, width = image_bgr.shape[:2]
+    return Frame(
+        path=Path(name),
+        image_bgr=image_bgr.copy(),
+        width=width,
+        height=height,
+        metadata={"source": "memory", **(metadata or {})},
+    )
+
+
 def _load_with_pillow(path: Path) -> np.ndarray | None:
     try:
         with open_image(path) as image:
@@ -35,4 +49,3 @@ def _load_with_pillow(path: Path) -> np.ndarray | None:
             return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
     except Exception:
         return None
-
