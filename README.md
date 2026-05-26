@@ -229,10 +229,10 @@ tools/output/kitti_pose_overlay.mp4
 
 GitHub 預覽：
 
-<video src="tools/output/kitti_pose_overlay.mp4" controls width="720"></video>
+[![KITTI 姿態 overlay 預覽](docs/media/kitti_pose_overlay_preview.gif)](tools/output/kitti_pose_overlay.mp4?raw=1)
 
-如果 README 未顯示播放器，可直接開啟影片檔：
-[tools/output/kitti_pose_overlay.mp4](tools/output/kitti_pose_overlay.mp4)
+點擊 GIF 可開啟原始 MP4：
+[tools/output/kitti_pose_overlay.mp4](tools/output/kitti_pose_overlay.mp4?raw=1)
 
 說明：
 
@@ -270,10 +270,10 @@ outputs/video_pose/predicted_pose_overlay.mp4
 
 GitHub 預覽：
 
-<video src="outputs/video_pose/predicted_pose_overlay.mp4" controls width="720"></video>
+[![Geometry pipeline 預測 overlay 預覽](docs/media/predicted_pose_overlay_preview.gif)](outputs/video_pose/predicted_pose_overlay.mp4?raw=1)
 
-如果 README 未顯示播放器，可直接開啟影片檔：
-[outputs/video_pose/predicted_pose_overlay.mp4](outputs/video_pose/predicted_pose_overlay.mp4)
+點擊 GIF 可開啟原始 MP4：
+[outputs/video_pose/predicted_pose_overlay.mp4](outputs/video_pose/predicted_pose_overlay.mp4?raw=1)
 
 說明：
 
