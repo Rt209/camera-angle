@@ -31,6 +31,10 @@ result.json
 output.json
 reports/
 outputs/
+!outputs/
+outputs/*
+!outputs/video_pose/
+!outputs/video_pose/**
 debug/
 
 # IDE and editor files
