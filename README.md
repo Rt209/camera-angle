@@ -227,6 +227,13 @@ pytest
 tools/output/kitti_pose_overlay.mp4
 ```
 
+GitHub 預覽：
+
+<video src="tools/output/kitti_pose_overlay.mp4" controls width="720"></video>
+
+如果 README 未顯示播放器，可直接開啟影片檔：
+[tools/output/kitti_pose_overlay.mp4](tools/output/kitti_pose_overlay.mp4)
+
 說明：
 
 這支影片是由內建工具 `tools/kitti_pose_video.py` 將 `tools/input/images/` 的 KITTI 影像序列與 `tools/input/oxts/` 的官方 yaw / pitch / roll 姿態資料合成而來。
@@ -260,6 +267,13 @@ tools/output/kitti_pose_overlay.mp4
 ```text
 outputs/video_pose/predicted_pose_overlay.mp4
 ```
+
+GitHub 預覽：
+
+<video src="outputs/video_pose/predicted_pose_overlay.mp4" controls width="720"></video>
+
+如果 README 未顯示播放器，可直接開啟影片檔：
+[outputs/video_pose/predicted_pose_overlay.mp4](outputs/video_pose/predicted_pose_overlay.mp4)
 
 說明：
 
