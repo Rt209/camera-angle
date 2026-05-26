@@ -214,3 +214,90 @@ pytest
 ```
 
 目前測試涵蓋檔案驗證、EXIF 讀取、數值轉換、roll estimation、Stage 0-3 pipeline 與 Stage 4-7 pose integration pipeline。
+
+## KITTI 影片與姿態評估輸出
+
+本專案目前包含一組 KITTI 測試影像 / OXTS 姿態資料，並提供內建工具將 KITTI frame 轉成影片。
+
+### 內建工具產生的 KITTI 姿態 overlay 影片
+
+檔案位置：
+
+```text
+tools/output/kitti_pose_overlay.mp4
+```
+
+說明：
+
+這支影片是由內建工具 `tools/kitti_pose_video.py` 將 `tools/input/images/` 的 KITTI 影像序列與 `tools/input/oxts/` 的官方 yaw / pitch / roll 姿態資料合成而來。
+
+它的用途是人工對照與 debug reference。影片左上角會顯示 KITTI OXTS 官方姿態數值。
+
+可重新產生：
+
+```bash
+python tools/kitti_pose_video.py --images tools/input/images --poses tools/input/oxts --output tools/output/kitti_pose_overlay.mp4
+```
+
+如果要產生沒有文字 overlay 的輸入影片，可使用：
+
+```bash
+python tools/kitti_pose_video.py --images tools/input/images --poses tools/input/oxts --output tools/output/kitti_no_overlay.mp4 --no-overlay
+```
+
+注意：
+
+```text
+tools/output/kitti_pose_overlay.mp4
+```
+
+不應作為 geometry pose pipeline 的主要演算法輸入，因為影片上的文字 overlay 會污染 edge / line detection。
+
+### Geometry pipeline 預測結果 overlay 影片
+
+檔案位置：
+
+```text
+outputs/video_pose/predicted_pose_overlay.mp4
+```
+
+說明：
+
+這支影片是目前離線影片姿態偵測 pipeline 的輸出。它使用 geometry-based pipeline 對影片 frame 做 yaw / pitch / roll 預測，並將 predicted pose、confidence、status 疊到輸出影片上。
+
+目前主要輸入影片為：
+
+```text
+tools/output/kitti_no_overlay.mp4
+```
+
+可重新產生：
+
+```bash
+python main.py --video tools/output/kitti_no_overlay.mp4 --sample-every 1 --output-dir outputs/video_pose --write-overlay
+```
+
+相關輸出：
+
+```text
+outputs/video_pose/pose_timeline.csv
+outputs/video_pose/frame_pose_results.json
+outputs/video_pose/predicted_pose_overlay.mp4
+```
+
+### 評估報告
+
+影片姿態偵測結果與 KITTI OXTS 官方姿態資料的比較報告位於：
+
+```text
+outputs/video_pose/evaluation/evaluation_report.md
+```
+
+該文件整理了：
+
+- `pose_vs_oxts.csv` 的逐幀誤差表
+- `pose_vs_oxts_summary.json` 的整體統計
+- `worst_frames.csv` 的最大誤差 frame
+- yaw / pitch / roll predicted vs OXTS 圖片
+- confidence vs absolute error 圖片
+- 目前實驗結果的初步解讀
