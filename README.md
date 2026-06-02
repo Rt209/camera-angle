@@ -1,35 +1,13 @@
 # visual-pose-angle-detector
 
-這是一個 Python CLI 專案，用來從單張圖片的影像內容估計視覺姿態角度。
+這是一個 Python CLI 專案，用來從圖片與影片估計視覺姿態角度，並輸出 yaw、pitch、roll、confidence、JSON、debug images、overlay video 與評估報告。
 
-目前主要進度是 **Stage 4-7：Pose Integration and Debug**。預設 pipeline 會執行圖片輸入、前處理、直線偵測、horizon detection、vanishing point detection，並輸出 `yaw`、`pitch`、`roll`、confidence 與 debug images。
+目前專案包含兩條主要技術路線：
+
+- Geometry-based pose pipeline：使用 edges、lines、horizon、vanishing point 等幾何特徵估計姿態。
+- Optical-flow pose debug prototype：使用 sparse optical flow、Essential Matrix、RANSAC、recoverPose 與 approximate K 估計 frame-to-frame relative pose。
 
 舊版 Stage 0-3 roll-only pipeline 仍可透過 `--stage-0-3` 執行。EXIF / metadata 報告功能仍保留，可透過 `--metadata` 執行。
-
-## 目前完成範圍
-
-Stage 4-7 pipeline：
-
-```text
-單張圖片
--> 讀取圖片
--> 前處理
--> 邊緣偵測
--> 直線偵測
--> Roll estimation
--> Horizon detection + Pitch estimation
--> Vanishing point detection + Yaw estimation
--> PoseResult + confidence
--> Rich Table / JSON / debug images
-```
-
-目前不處理：
-
-- batch validation / metrics report
-- video input
-- realtime camera input
-- deep learning-based pose estimation
-- automatic camera calibration
 
 ## 測試圖片來源
 
@@ -312,31 +290,31 @@ outputs/video_pose/evaluation/evaluation_report.md
 
 ## Optical Flow Pose Debug Prototype
 
-?? optical-flow pose ??? calibration video ???????? pipeline ???? approximate K ? debug/prototype?????? frame-to-frame relative yaw / pitch / roll???????? calibrated pose?
+目前 optical-flow pose 不再以 calibration video 作為主流程。這條 pipeline 固定使用 approximate K 做 debug/prototype，目標是觀察 frame-to-frame relative yaw / pitch / roll，而不是輸出正式 calibrated pose。
 
-### Optical-flow pose overlay ??
+### Optical-flow pose overlay 影片
 
-?????
+檔案位置：
 
 ```text
 outputs/optical_flow_pose/pose_overlay_uncalibrated/output_pose_overlay.mp4
 ```
 
-GitHub ???
+GitHub 預覽：
 
-![Optical-flow pose overlay ??](docs/media/optical_flow_pose_overlay_preview.gif)
+![Optical-flow pose overlay 預覽](docs/media/optical_flow_pose_overlay_preview.gif)
 
-???
+說明：
 
-??????? optical-flow pose prototype ??????? Shi-Tomasi + Lucas-Kanade sparse optical flow ?? feature points??? approximate K?Essential Matrix?RANSAC?recoverPose ?? frame-to-frame relative yaw / pitch / roll??? tracked points?flow arrows?RANSAC inliers/outliers?confidence ? warning ??????
+這支影片是目前 optical-flow pose prototype 的輸出。它使用 Shi-Tomasi + Lucas-Kanade sparse optical flow 追蹤 feature points，再用 approximate K、Essential Matrix、RANSAC、recoverPose 估計 frame-to-frame relative yaw / pitch / roll，並將 tracked points、flow arrows、RANSAC inliers/outliers、confidence 與 warning 疊到影片上。
 
-??????????
+目前主要輸入影片為：
 
 ```text
 tools/output/kitti_no_overlay.mp4
 ```
 
-??????
+可重新產生：
 
 ```bash
 python tools/write_uncalibrated_pose_overlay.py ^
@@ -346,7 +324,7 @@ python tools/write_uncalibrated_pose_overlay.py ^
   --output-debug-every-n-frames 10
 ```
 
-?????
+相關輸出：
 
 ```text
 outputs/optical_flow_pose/pose_overlay_uncalibrated/output_pose_overlay.mp4
@@ -355,15 +333,15 @@ outputs/optical_flow_pose/pose_overlay_uncalibrated/frame_pose_results.json
 outputs/optical_flow_pose/pose_overlay_uncalibrated/debug_frames/
 ```
 
-### Optical-flow relative pose ????
+### Optical-flow relative pose 評估報告
 
-Optical-flow pose ??? KITTI OXTS frame-to-frame delta ????????
+Optical-flow pose 結果與 KITTI OXTS frame-to-frame delta 的比較報告位於：
 
 ```text
 outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation/evaluation_report.md
 ```
 
-??????
+可重新產生：
 
 ```bash
 python tools/evaluate_uncalibrated_pose_overlay_against_oxts.py ^
@@ -372,18 +350,18 @@ python tools/evaluate_uncalibrated_pose_overlay_against_oxts.py ^
   --output-dir outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation
 ```
 
-???????
+該文件整理了：
 
-- `relative_pose_vs_oxts.csv` ??? relative yaw / pitch / roll ??
-- `relative_pose_vs_oxts_summary.json` ?????
-- `worst_frames.csv` ????? frame
-- yaw / pitch / roll predicted relative vs OXTS delta ??
-- confidence vs absolute error ??
-- ?? prototype ???? warning
+- `relative_pose_vs_oxts.csv` 的逐幀 relative yaw / pitch / roll 誤差
+- `relative_pose_vs_oxts_summary.json` 的整體統計
+- `worst_frames.csv` 的最大誤差 frame
+- yaw / pitch / roll predicted relative vs OXTS delta 圖片
+- confidence vs absolute error 圖片
+- 目前 prototype 的限制與 warning
 
 ### Sparse optical flow debug
 
-??????????? flow vectors?????
+若只想檢查光流追蹤點與 flow vectors，可執行：
 
 ```bash
 python tools/analyze_optical_flow_paths.py ^
@@ -394,7 +372,7 @@ python tools/analyze_optical_flow_paths.py ^
   --output-debug-every-n-frames 10
 ```
 
-?????
+相關輸出：
 
 ```text
 outputs/optical_flow_pose/sparse_flow/flow_summary.json
@@ -404,7 +382,7 @@ outputs/optical_flow_pose/sparse_flow/debug_frames/
 
 ### Parameter debug
 
-???? outlier frame ??? debug???? baseline ? outlier frame deep dive?
+若要針對 outlier frame 做參數 debug，先建立 baseline 與 outlier frame deep dive：
 
 ```bash
 python tools/debug_optical_flow_pose_parameters.py ^
@@ -416,7 +394,7 @@ python tools/debug_optical_flow_pose_parameters.py ^
   --output-debug-every-n-frames 10
 ```
 
-?????
+相關輸出：
 
 ```text
 outputs/optical_flow_pose/parameter_debug/evaluation_report.md
@@ -425,7 +403,7 @@ debug/experiments/optical_flow_pose/001_baseline/
 debug/experiments/optical_flow_pose/005_outlier_frame_deep_dive/
 ```
 
-???? prototype ?????????
+注意：此 prototype 會在每筆結果標示：
 
 ```text
 intrinsics_not_calibrated
@@ -433,11 +411,11 @@ approximate_K_used
 pose_for_debug_only
 ```
 
-?????????? calibrated pose result??????? OXTS absolute yaw / pitch / roll ?????
+不要將此輸出視為正式 calibrated pose result，也不要把它和 OXTS absolute yaw / pitch / roll 直接比較。
 
 ### Optical Flow Pose Tests
 
-?? optical-flow pose ?????
+只跑 optical-flow pose 新增測試：
 
 ```bash
 pytest tests/test_sparse_flow_tracker.py ^
@@ -448,13 +426,13 @@ pytest tests/test_sparse_flow_tracker.py ^
   tests/test_debug_optical_flow_pose_parameters.py
 ```
 
-???? geometry-based pipeline ?????
+確認既有 geometry-based pipeline 沒被破壞：
 
 ```bash
 pytest tests/test_pose_integration_pipeline.py tests/test_visual_pose_pipeline.py
 ```
 
-?????
+全部測試：
 
 ```bash
 pytest
