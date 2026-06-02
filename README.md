@@ -44,11 +44,11 @@ KITTI 由 Karlsruhe Institute of Technology 與 Toyota Technological Institute a
 ```text
 examples/0.png
 examples/picture_information.txt
-breakdown/06_Debug/examples_0_pose_debug_process.md
-breakdown/06_Debug/examples_0_artifacts/
+breakdown/01_Geometry_Based_Pose/06_Debug/examples_0_pose_debug_process.md
+breakdown/01_Geometry_Based_Pose/06_Debug/examples_0_artifacts/
 ```
 
-其中 `picture_information.txt` 記錄該圖片對應的 yaw / pitch / roll 參考值，`breakdown/06_Debug/` 則保存本案例的 debug 分析流程與代表性 artifact。
+其中 `picture_information.txt` 記錄該圖片對應的 yaw / pitch / roll 參考值，`breakdown/01_Geometry_Based_Pose/06_Debug/` 則保存本案例的 debug 分析流程與代表性 artifact。
 
 ## 專案結構
 
@@ -205,7 +205,7 @@ Stage 4-7 的輸出會包含：
 | `yaw_overlay` | `17_yaw_overlay.png` | yaw 估計結果 |
 | `pose_overlay` | `18_pose_overlay.png` | yaw / pitch / roll 最終疊圖 |
 
-根目錄 `debug/` 是本機執行產物，已被 `.gitignore` 忽略。若需要保留代表性 debug 結果，請放在 `breakdown/06_Debug/` 並搭配分析文件說明。
+根目錄 `debug/` 是本機執行產物，已被 `.gitignore` 忽略。若需要保留代表性 geometry debug 結果，請放在 `breakdown/01_Geometry_Based_Pose/06_Debug/` 並搭配分析文件說明。
 
 ## 測試
 
@@ -229,10 +229,7 @@ tools/output/kitti_pose_overlay.mp4
 
 GitHub 預覽：
 
-[![KITTI 姿態 overlay 預覽](docs/media/kitti_pose_overlay_preview.gif)](tools/output/kitti_pose_overlay.mp4?raw=1)
-
-點擊 GIF 可開啟原始 MP4：
-[tools/output/kitti_pose_overlay.mp4](tools/output/kitti_pose_overlay.mp4?raw=1)
+![KITTI 姿態 overlay 預覽](docs/media/kitti_pose_overlay_preview.gif)
 
 說明：
 
@@ -270,10 +267,7 @@ outputs/video_pose/predicted_pose_overlay.mp4
 
 GitHub 預覽：
 
-[![Geometry pipeline 預測 overlay 預覽](docs/media/predicted_pose_overlay_preview.gif)](outputs/video_pose/predicted_pose_overlay.mp4?raw=1)
-
-點擊 GIF 可開啟原始 MP4：
-[outputs/video_pose/predicted_pose_overlay.mp4](outputs/video_pose/predicted_pose_overlay.mp4?raw=1)
+![Geometry pipeline 預測 overlay 預覽](docs/media/predicted_pose_overlay_preview.gif)
 
 說明：
 
@@ -315,3 +309,153 @@ outputs/video_pose/evaluation/evaluation_report.md
 - yaw / pitch / roll predicted vs OXTS 圖片
 - confidence vs absolute error 圖片
 - 目前實驗結果的初步解讀
+
+## Optical Flow Pose Debug Prototype
+
+?? optical-flow pose ??? calibration video ???????? pipeline ???? approximate K ? debug/prototype?????? frame-to-frame relative yaw / pitch / roll???????? calibrated pose?
+
+### Optical-flow pose overlay ??
+
+?????
+
+```text
+outputs/optical_flow_pose/pose_overlay_uncalibrated/output_pose_overlay.mp4
+```
+
+GitHub ???
+
+![Optical-flow pose overlay ??](docs/media/optical_flow_pose_overlay_preview.gif)
+
+???
+
+??????? optical-flow pose prototype ??????? Shi-Tomasi + Lucas-Kanade sparse optical flow ?? feature points??? approximate K?Essential Matrix?RANSAC?recoverPose ?? frame-to-frame relative yaw / pitch / roll??? tracked points?flow arrows?RANSAC inliers/outliers?confidence ? warning ??????
+
+??????????
+
+```text
+tools/output/kitti_no_overlay.mp4
+```
+
+??????
+
+```bash
+python tools/write_uncalibrated_pose_overlay.py ^
+  --video tools/output/kitti_no_overlay.mp4 ^
+  --debug-dir outputs/optical_flow_pose/pose_overlay_uncalibrated ^
+  --max-debug-frames 120 ^
+  --output-debug-every-n-frames 10
+```
+
+?????
+
+```text
+outputs/optical_flow_pose/pose_overlay_uncalibrated/output_pose_overlay.mp4
+outputs/optical_flow_pose/pose_overlay_uncalibrated/pose_timeline.csv
+outputs/optical_flow_pose/pose_overlay_uncalibrated/frame_pose_results.json
+outputs/optical_flow_pose/pose_overlay_uncalibrated/debug_frames/
+```
+
+### Optical-flow relative pose ????
+
+Optical-flow pose ??? KITTI OXTS frame-to-frame delta ????????
+
+```text
+outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation/evaluation_report.md
+```
+
+??????
+
+```bash
+python tools/evaluate_uncalibrated_pose_overlay_against_oxts.py ^
+  --pose-json outputs/optical_flow_pose/pose_overlay_uncalibrated/frame_pose_results.json ^
+  --oxts-dir tools/input/oxts ^
+  --output-dir outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation
+```
+
+???????
+
+- `relative_pose_vs_oxts.csv` ??? relative yaw / pitch / roll ??
+- `relative_pose_vs_oxts_summary.json` ?????
+- `worst_frames.csv` ????? frame
+- yaw / pitch / roll predicted relative vs OXTS delta ??
+- confidence vs absolute error ??
+- ?? prototype ???? warning
+
+### Sparse optical flow debug
+
+??????????? flow vectors?????
+
+```bash
+python tools/analyze_optical_flow_paths.py ^
+  --video tools/output/kitti_no_overlay.mp4 ^
+  --debug-dir outputs/optical_flow_pose/sparse_flow ^
+  --frame-step 1 ^
+  --max-debug-frames 120 ^
+  --output-debug-every-n-frames 10
+```
+
+?????
+
+```text
+outputs/optical_flow_pose/sparse_flow/flow_summary.json
+outputs/optical_flow_pose/sparse_flow/flow_tracks.csv
+outputs/optical_flow_pose/sparse_flow/debug_frames/
+```
+
+### Parameter debug
+
+???? outlier frame ??? debug???? baseline ? outlier frame deep dive?
+
+```bash
+python tools/debug_optical_flow_pose_parameters.py ^
+  --video tools/output/kitti_no_overlay.mp4 ^
+  --oxts-dir tools/input/oxts ^
+  --output-root outputs/optical_flow_pose/parameter_debug ^
+  --debug-root debug/experiments/optical_flow_pose ^
+  --max-debug-frames 120 ^
+  --output-debug-every-n-frames 10
+```
+
+?????
+
+```text
+outputs/optical_flow_pose/parameter_debug/evaluation_report.md
+outputs/optical_flow_pose/parameter_debug/baseline/
+debug/experiments/optical_flow_pose/001_baseline/
+debug/experiments/optical_flow_pose/005_outlier_frame_deep_dive/
+```
+
+???? prototype ?????????
+
+```text
+intrinsics_not_calibrated
+approximate_K_used
+pose_for_debug_only
+```
+
+?????????? calibrated pose result??????? OXTS absolute yaw / pitch / roll ?????
+
+### Optical Flow Pose Tests
+
+?? optical-flow pose ?????
+
+```bash
+pytest tests/test_sparse_flow_tracker.py ^
+  tests/test_euler_angle_converter.py ^
+  tests/test_essential_pose_estimator.py ^
+  tests/test_uncalibrated_pose_overlay_pipeline.py ^
+  tests/test_evaluate_uncalibrated_pose_overlay_against_oxts.py ^
+  tests/test_debug_optical_flow_pose_parameters.py
+```
+
+???? geometry-based pipeline ?????
+
+```bash
+pytest tests/test_pose_integration_pipeline.py tests/test_visual_pose_pipeline.py
+```
+
+?????
+
+```bash
+pytest
+```

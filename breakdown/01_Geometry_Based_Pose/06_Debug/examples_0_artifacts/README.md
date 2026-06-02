@@ -1,6 +1,6 @@
 # examples/0.png Debug Artifacts
 
-這個資料夾保存 `python main.py --path examples/0.png` 產生的 Stage 4-7 debug 圖片，用來對照 `breakdown/06_Debug/examples_0_pose_debug_process.md` 中的分析過程。
+這個資料夾保存 `python main.py --path examples/0.png` 產生的 Stage 4-7 debug 圖片，用來對照 `breakdown/01_Geometry_Based_Pose/06_Debug/examples_0_pose_debug_process.md` 中的分析過程。
 
 ## 圖片預覽
 

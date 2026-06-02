@@ -465,7 +465,7 @@ pytest -q
 本案例的 debug 圖片已整理到：
 
 ```text
-breakdown/06_Debug/examples_0_artifacts/
+breakdown/01_Geometry_Based_Pose/06_Debug/examples_0_artifacts/
 ```
 
 該資料夾可以作為獨立案例包上傳，內容包含：
@@ -481,7 +481,7 @@ breakdown/06_Debug/examples_0_artifacts/
 索引文件：
 
 ```text
-breakdown/06_Debug/examples_0_artifacts/README.md
+breakdown/01_Geometry_Based_Pose/06_Debug/examples_0_artifacts/README.md
 ```
 
 打開該 README 時，Markdown 會直接顯示每張 debug 圖片預覽，可用來對照本文件中的各個實驗步驟。

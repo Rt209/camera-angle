@@ -532,13 +532,13 @@ task_name: implement_stage_4_7_pose_integration_and_debug
 
 你必須先閱讀並遵守以下文件規範：
 
-1. `breakdown/00_Overview/breakdown_architecture_principles.md`
-2. `breakdown/00_Overview/project_breakdown_overview.md`
-3. `breakdown/03_Design/bounded_context_map.md`
-4. `breakdown/03_Design/system_design_breakdown.md`
-5. `breakdown/04_Implementation/stage_0_3_foundation_and_roll.md`
-6. `breakdown/04_Implementation/stage_4_7_pose_integration_and_debug.md`
-7. `breakdown/05_Verification/verification_plan.md`
+1. `breakdown/01_Geometry_Based_Pose/00_Overview/breakdown_architecture_principles.md`
+2. `breakdown/01_Geometry_Based_Pose/00_Overview/project_breakdown_overview.md`
+3. `breakdown/01_Geometry_Based_Pose/03_Design/bounded_context_map.md`
+4. `breakdown/01_Geometry_Based_Pose/03_Design/system_design_breakdown.md`
+5. `breakdown/01_Geometry_Based_Pose/04_Implementation/stage_0_3_foundation_and_roll.md`
+6. `breakdown/01_Geometry_Based_Pose/04_Implementation/stage_4_7_pose_integration_and_debug.md`
+7. `breakdown/01_Geometry_Based_Pose/05_Verification/verification_plan.md`
 
 也請參考目前已完成的 Stage 0-3 程式碼：
 

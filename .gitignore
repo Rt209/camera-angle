@@ -30,11 +30,9 @@ dist/
 result.json
 output.json
 reports/
-outputs/
-!outputs/
-outputs/*
-!outputs/video_pose/
-!outputs/video_pose/**
+outputs/optical_flow_pose/parameter_debug/
+outputs/optical_flow_pose/sparse_flow/
+outputs/optical_flow_pose/pose_overlay_uncalibrated/debug_frames/
 debug/
 
 # IDE and editor files
