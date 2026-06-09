@@ -2,19 +2,17 @@
 
 ## 1. 目的
 
-本文件定義 Optical Flow Pose Pipeline 如何取得 camera intrinsics。
+本文件定義 Optical Flow Pose Pipeline 中 camera intrinsics 的背景知識、限制與升級路線。
 
-新的需求假設是：一般使用者不會知道 FOV、`f_x`、`f_y` 是什麼，也不應被要求手動輸入這些參數。因此第一版不以「手動輸入 FOV / focal length」作為主要流程，而是使用 calibration video 取得 camera intrinsic matrix `K`。
+目前主決策是：第一版不假設能取得 chessboard / Charuco calibration video，也不要求一般使用者手動輸入 FOV、`f_x`、`f_y`。因此主流程先使用 approximate K 做 debug-only relative pose。
 
 第一版主流程：
 
 ```text
-拍攝棋盤格或 Charuco board calibration video
--> 從影片抽取 calibration frames
--> 偵測 calibration pattern corners
--> 使用 cv2.calibrateCamera
--> 輸出 camera_intrinsics.json
--> 提供 optical-flow pose pipeline 使用
+讀取 pose video
+-> 根據影像解析度建立 approximate K
+-> optical-flow pose pipeline 使用 approximate K
+-> 所有輸出標記 intrinsics_not_calibrated / approximate_K_used / pose_for_debug_only
 ```
 
 ## 2. 為什麼不能只從一般影片可靠推出 K
@@ -37,17 +35,56 @@ flow = (u2 - u1, v2 - v1)
 
 因此，單靠一般影片通常無法穩定、唯一地估出精確的 `c_x`、`c_y`、`f_x`、`f_y`。可以做 self-calibration 或 focal search，但這比較適合後續研究版，不適合作為第一版主要流程。
 
-## 3. 第一版選擇：Calibration Video
+## 3. 第一版選擇：Approximate K
 
-第一版使用 calibration video，原因是：
+第一版使用 approximate K，原因是：
 
 | 原因 | 說明 |
 |---|---|
-| 使用者容易理解 | 使用者只需要拍棋盤格或 Charuco board，不需要理解 `f_x`、`f_y` |
+| 與目前資料條件一致 | 不假設一定能取得 calibration video |
+| 使用者門檻低 | 不要求使用者理解 FOV、`f_x`、`f_y` |
+| 工程啟動快 | 可以先驗證 optical flow、RANSAC、pose overlay 與 debug 流程 |
+| 風險可控 | 所有輸出都標示 debug-only，不宣稱 calibrated pose |
+
+Approximate K：
+
+```text
+f = max(width, height)
+cx = width / 2
+cy = height / 2
+K =
+| f   0  cx |
+| 0   f  cy |
+| 0   0   1 |
+```
+
+限制：
+
+- 無法修正 lens distortion。
+- yaw / pitch / roll 可能有系統性誤差。
+- 結果只適合 debug、趨勢觀察、參數比較。
+
+## 3.1 後續升級：Calibration Video
+
+若未來能取得 calibration video，可以升級為 calibrated K：
+
+```text
+拍攝棋盤格或 Charuco board calibration video
+-> 從影片抽取 calibration frames
+-> 偵測 calibration pattern corners
+-> 使用 cv2.calibrateCamera
+-> 輸出 camera_intrinsics.json
+-> 提供 optical-flow pose pipeline 使用
+```
+
+Calibration video 的優點：
+
+| 原因 | 說明 |
+|---|---|
 | OpenCV 支援完整 | 可使用 `cv2.findChessboardCorners`、`cv2.aruco`、`cv2.calibrateCamera` |
 | 結果可驗證 | 可輸出 reprojection error |
 | 可估 lens distortion | 不只得到 `K`，也能得到 distortion coefficients |
-| 適合後續 pose recovery | Essential Matrix / recoverPose 需要可靠 `K` |
+| 適合正式 pose recovery | Essential Matrix / recoverPose 需要可靠 `K` |
 
 ## 4. Camera Intrinsic Matrix
 
@@ -76,6 +113,8 @@ dist_coeffs = [k1, k2, p1, p2, k3, ...]
 ```
 
 ## 5. Calibration Video 輸入需求
+
+以下內容只屬於後續 calibrated K 升級路線，不是第一版必要輸入。
 
 | 項目 | 建議 |
 |---|---|
@@ -160,7 +199,7 @@ y_n = (v - c_y) / f_y
 
 ## 10. 後續工具切入點
 
-第一版工具應改為：
+若要做 calibrated K 升級，可新增：
 
 ```text
 tools/calibrate_camera_from_video.py
@@ -173,4 +212,3 @@ outputs/calibration/camera_intrinsics.json
 outputs/calibration/calibration_report.md
 outputs/calibration/debug/detected_corners/
 ```
-
