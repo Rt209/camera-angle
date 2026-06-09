@@ -2,6 +2,21 @@
 
 這個資料夾保存 `python main.py --path examples/0.png` 產生的 Stage 4-7 debug 圖片，用來對照 `breakdown/01_Geometry_Based_Pose/06_Debug/examples_0_pose_debug_process.md` 中的分析過程。
 
+Artifacts 對應 `02_Analysis/README.md` 的 A1-A10 小階段：
+
+```mermaid
+flowchart TD
+    A[A1 Input] --> B[01_input]
+    B --> C[A2 Preprocessing<br/>02-04]
+    C --> D[A3 Line Detection<br/>05-07]
+    D --> E[A4 Roll<br/>08-10]
+    D --> F[A5 Pitch / Horizon<br/>11-13]
+    D --> G[A6 Yaw / VP<br/>14-17]
+    E --> H[A7-A9 Final Pose<br/>18]
+    F --> H
+    G --> H
+```
+
 ## 圖片預覽
 
 ### 1. Input And Preprocessing
