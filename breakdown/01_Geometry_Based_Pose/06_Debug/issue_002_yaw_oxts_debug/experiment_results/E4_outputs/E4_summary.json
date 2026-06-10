@@ -1,0 +1,109 @@
+{
+  "experiment": "E4_confidence_reliability",
+  "yaw_confidence_failure_confirmed": true,
+  "overall_confidence_failure_confirmed": true,
+  "confidence_reliable_for_yaw_failure": false,
+  "failure_concentrated_in_frames_91_100": false,
+  "failure_thresholds": {
+    "high_yaw_confidence": 0.85,
+    "high_overall_confidence": 0.85,
+    "high_yaw_error_deg": 30
+  },
+  "row_count": 154,
+  "high_yaw_error_count_all_frames": 101,
+  "high_yaw_confidence_count_all_frames": 154,
+  "failure_count_all_frames": 101,
+  "overall_failure_count_all_frames": 91,
+  "failure_count_91_100": 10,
+  "overall_failure_count_91_100": 10,
+  "frames_91_100_count": 10,
+  "failure_frames_91_100": [
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100
+  ],
+  "failure_rate_all_frames": 0.6558441558441559,
+  "failure_rate_91_100": 1.0,
+  "mean_abs_yaw_error_all": 49.28579095460927,
+  "mean_abs_yaw_error_failure": 71.97112110308076,
+  "mean_yaw_confidence_failure": 0.9801980198019802,
+  "mean_overall_confidence_failure": 0.8800990099009901,
+  "support_analysis": {
+    "vanishing_point_candidate_count_q75": 912.5,
+    "high_vp_candidate_frame_count": 39,
+    "high_vp_candidate_high_error_count": 7,
+    "high_vp_candidate_high_error_frames": [
+      52,
+      54,
+      55,
+      56,
+      57,
+      58,
+      62
+    ],
+    "mean_abs_yaw_error_high_vp_candidate": 13.339963415655557,
+    "median_abs_yaw_error_high_vp_candidate": 6.6560782563971514,
+    "perspective_line_count_q75": 57.75,
+    "high_perspective_line_frame_count": 39,
+    "high_perspective_line_high_error_count": 6,
+    "high_perspective_line_high_error_frames": [
+      52,
+      54,
+      55,
+      56,
+      58,
+      62
+    ],
+    "mean_abs_yaw_error_high_perspective_line": 11.271142543753415,
+    "median_abs_yaw_error_high_perspective_line": 4.908184057479318
+  },
+  "production_code_modified": false,
+  "validation_checks": [
+    {
+      "id": "S1",
+      "status": "pass",
+      "detail": "rows=154"
+    },
+    {
+      "id": "S2",
+      "status": "pass",
+      "detail": "required fields checked"
+    },
+    {
+      "id": "S3",
+      "status": "pass",
+      "detail": "derived flags generated"
+    },
+    {
+      "id": "S4",
+      "status": "pass",
+      "detail": "all yaw confidence failures=101"
+    },
+    {
+      "id": "S5",
+      "status": "pass",
+      "detail": "frames 91-100 yaw confidence failures=10"
+    },
+    {
+      "id": "S6",
+      "status": "pass",
+      "detail": "vp_candidate_q75=912.5, perspective_line_q75=57.75"
+    },
+    {
+      "id": "S7",
+      "status": "pass",
+      "detail": "conclusion explains confidence reliability and missing VP stability/ambiguity features"
+    }
+  ],
+  "all_frames_failure_not_exclusive_to_91_100": true,
+  "severe_top10_failures_all_in_91_100": true,
+  "failure_count_outside_91_100": 91,
+  "failure_concentration_note": "Yaw confidence failures are not exclusive to frames 91-100 by count, but the top 10 most severe yaw errors are all frames 91-100 and all are confidence failures."
+}

@@ -1,0 +1,158 @@
+{
+  "experiment": "E2_E3_yaw_error_source",
+  "e2_global_sign_bug_confirmed": false,
+  "e2_local_sign_flip_suspected": true,
+  "e3_vp_selection_error_confirmed": null,
+  "e3_vp_selection_error_reason": "debug artifacts missing; data-level VP side/sign flip suspected but visual VP cluster error is inconclusive",
+  "frames_reviewed": [
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103
+  ],
+  "top_10_yaw_error_frames": [
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100
+  ],
+  "metrics": {
+    "all_frames": {
+      "count": 154,
+      "mae_original": 49.28579095460927,
+      "mae_inverted": 72.91653593980823,
+      "improved_frame_count": 60
+    },
+    "frames_91_100": {
+      "count": 10,
+      "mae_original": 113.008571617248,
+      "mae_inverted": 6.4455230852024945,
+      "improved_frame_count": 10
+    },
+    "outside_91_100": {
+      "count": 144,
+      "mae_original": 44.860597853037135,
+      "mae_inverted": 77.53257849915585,
+      "improved_frame_count": 50
+    },
+    "top_10_yaw_error_frames": {
+      "frames": [
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100
+      ],
+      "count": 10,
+      "mae_original": 113.008571617248,
+      "mae_inverted": 6.4455230852024945,
+      "improved_frame_count": 10
+    }
+  },
+  "production_code_modified": false,
+  "debug_artifacts_available": false,
+  "validation_checks": [
+    {
+      "scope": "E2",
+      "id": "S1",
+      "status": "pass",
+      "detail": "pose_vs_oxts.csv rows=154"
+    },
+    {
+      "scope": "E2",
+      "id": "S2",
+      "status": "pass",
+      "detail": "fields=['frame_index', 'pred_yaw', 'oxts_yaw', 'abs_yaw_error']"
+    },
+    {
+      "scope": "E2",
+      "id": "S3",
+      "status": "pass",
+      "detail": "all_mae_original=49.28579095460927"
+    },
+    {
+      "scope": "E2",
+      "id": "S4",
+      "status": "pass",
+      "detail": "frames_91_100_count=10"
+    },
+    {
+      "scope": "E2",
+      "id": "S5",
+      "status": "pass",
+      "detail": "inverted MAE calculated for all required ranges"
+    },
+    {
+      "scope": "E2",
+      "id": "S6",
+      "status": "pass",
+      "detail": "global sign judgment uses all frames and outside 91-100, not only local frames"
+    },
+    {
+      "scope": "E3",
+      "id": "S1",
+      "status": "pass",
+      "detail": "frames_88_103_count=16"
+    },
+    {
+      "scope": "E3",
+      "id": "S2",
+      "status": "pass",
+      "detail": "frames 91-100 included"
+    },
+    {
+      "scope": "E3",
+      "id": "S3",
+      "status": "pass",
+      "detail": "selected VP x/y checked per frame"
+    },
+    {
+      "scope": "E3",
+      "id": "S4",
+      "status": "pass",
+      "detail": "perspective line and VP candidate counts exist per frame"
+    },
+    {
+      "scope": "E3",
+      "id": "S5",
+      "status": "pass",
+      "detail": "all VP statuses are in correct/suspicious/wrong/missing"
+    },
+    {
+      "scope": "E3",
+      "id": "S6",
+      "status": "pass",
+      "detail": "E3 conclusion references E2 local sign variant result"
+    }
+  ],
+  "written_files": [
+    "breakdown\\01_Geometry_Based_Pose\\06_Debug\\issue_002_yaw_oxts_debug\\experiment_results\\E2_E3_outputs\\E2_E3_experiment_design.md",
+    "breakdown\\01_Geometry_Based_Pose\\06_Debug\\issue_002_yaw_oxts_debug\\experiment_results\\E2_E3_outputs\\yaw_sign_variant_analysis.csv",
+    "breakdown\\01_Geometry_Based_Pose\\06_Debug\\issue_002_yaw_oxts_debug\\experiment_results\\E2_E3_outputs\\vp_failure_frame_review.md",
+    "breakdown\\01_Geometry_Based_Pose\\06_Debug\\issue_002_yaw_oxts_debug\\experiment_results\\E2_E3_outputs\\E2_E3_results.md",
+    "breakdown\\01_Geometry_Based_Pose\\06_Debug\\issue_002_yaw_oxts_debug\\experiment_results\\E2_E3_outputs\\E2_E3_summary.json"
+  ]
+}

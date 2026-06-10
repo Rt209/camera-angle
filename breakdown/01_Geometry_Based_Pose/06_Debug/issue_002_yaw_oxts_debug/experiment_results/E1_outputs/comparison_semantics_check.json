@@ -1,0 +1,74 @@
+{
+  "experiment": "E1_comparison_semantics",
+  "hypothesis": "H1_geometry_yaw_and_oxts_yaw_are_not_same_semantics",
+  "h1_confirmed": true,
+  "confirmed_reason": "pred_yaw 來自單張影像 vanishing point 的 geometry yaw 近似；oxts_yaw 來自 KITTI raw OXTS values[5] 的 absolute heading/reference pose yaw。evaluation 直接計算 pred_yaw - oxts_yaw，沒有 camera/vehicle/world 座標轉換、vehicle-to-camera transform、Euler rotation order 對齊或 comparison_type/calibrated_pose 標記，因此目前不是同語意、同座標系、同姿態類型的嚴格比較。",
+  "rejection_reason": null,
+  "comparison_type_current": "geometry_single_frame_yaw_vs_oxts_absolute_heading",
+  "comparison_type_expected_if_strict": "calibrated_camera_or_vehicle_heading_vs_oxts_absolute_heading_with_coordinate_frame_and_rotation_convention_alignment",
+  "same_semantics": false,
+  "production_code_modified": false,
+  "pose_semantics": {
+    "pred_yaw": "single_frame_vanishing_point_based_image_geometry_yaw_degree",
+    "oxts_yaw": "kitti_raw_oxts_values_5_absolute_heading_yaw_degree"
+  },
+  "evaluation_behavior": {
+    "pred_yaw_source": "outputs/video_pose/pose_timeline.csv column yaw",
+    "oxts_yaw_source": "tools/input/oxts/*.txt parsed by tools.kitti_pose_video.parse_pose_text as values[5] radians then degrees",
+    "yaw_error_formula": "row['yaw'] - pose.yaw_deg",
+    "camera_coordinate_transform": false,
+    "vehicle_to_camera_transform": false,
+    "euler_rotation_order_alignment": false,
+    "comparison_type_marked": false,
+    "calibrated_pose_marked": false
+  },
+  "evidence": [
+    {
+      "file": "src/contexts/pose_estimation/services/yaw_estimator.py",
+      "lines": [26, 27, 28, 33],
+      "summary": "estimate_yaw 使用 selected vanishing point 的 x 偏移、image center 與 focal length fallback，以 atan 轉成 degree，method 是 vanishing_point_based_yaw_estimation。"
+    },
+    {
+      "file": "src/app/pipeline.py",
+      "lines": [162, 171, 188, 198],
+      "summary": "run_stage_4_7_pose_pipeline_on_frame 在單幀 Frame 中偵測 vanishing point、估計 yaw，並用 build_pose_result 寫入 PoseResult。"
+    },
+    {
+      "file": "src/app/video_pipeline.py",
+      "lines": [82, 152, 155, 179],
+      "summary": "run_video_pose_pipeline 逐幀送入單幀 pipeline；VideoPoseFrameResult.to_timeline_row 將 pose_result yaw 寫入 pose_timeline.csv。"
+    },
+    {
+      "file": "tools/kitti_pose_video.py",
+      "lines": [61, 62, 64, 71],
+      "summary": "KITTI raw OXTS 解析使用 values[5] 作為 yaw radians，並以 math.degrees 轉成 yaw_deg。"
+    },
+    {
+      "file": "tools/evaluate_video_pose_against_oxts.py",
+      "lines": [215, 221, 222, 223],
+      "summary": "_evaluate_row 直接用 row['yaw'] 與 pose.yaw_deg 相減，並輸出 pred_yaw、oxts_yaw、yaw_error。"
+    },
+    {
+      "file": "outputs/video_pose/evaluation/pose_vs_oxts_summary.json",
+      "summary": "summary 只包含 yaw/pitch/roll error metrics 與 top error frames，沒有 comparison_type、calibrated_pose 或 not_same_coordinate_semantics 標記。"
+    }
+  ],
+  "required_document_updates": [
+    "在 breakdown/01_Geometry_Based_Pose/06_Debug/issue_002_yaw_oxts_debug/README.md 標記目前 yaw evaluation 是 debug comparison，不是 calibrated absolute heading evaluation。",
+    "在 outputs/video_pose/evaluation 報告或後續 summary 加入 comparison_type=geometry_single_frame_yaw_vs_oxts_absolute_heading。",
+    "在 outputs/video_pose/evaluation 報告或後續 summary 加入 calibrated_pose=false 與 comparison_warning=not_same_coordinate_semantics。",
+    "在 breakdown/01_Geometry_Based_Pose/02_Analysis/README.md 的 A6/A10 補充 VP yaw 與 OXTS yaw 的姿態語意差異，以及嚴格比較所需的座標轉換條件。"
+  ],
+  "checked_files": [
+    "main.py",
+    "src/cli/commands.py",
+    "src/app/video_pipeline.py",
+    "src/app/pipeline.py",
+    "src/contexts/pose_estimation/services/yaw_estimator.py",
+    "tools/evaluate_video_pose_against_oxts.py",
+    "tools/kitti_pose_video.py",
+    "outputs/video_pose/pose_timeline.csv",
+    "outputs/video_pose/evaluation/pose_vs_oxts.csv",
+    "outputs/video_pose/evaluation/pose_vs_oxts_summary.json"
+  ]
+}
