@@ -48,3 +48,8 @@ flowchart TD
 |---|---|---|
 | `examples/0.png` | `examples_0_pose_debug_process.md` | `examples_0_artifacts/` |
 
+## 5. Issue Debug Notes
+
+| Issue | Debug Folder | Purpose |
+|---|---|---|
+| #2 | `issue_002_yaw_oxts_debug/README.md` | Debug geometry yaw vs KITTI OXTS error, especially frames 91-100 |
