@@ -1,0 +1,26 @@
+{
+  "model_type": "linear",
+  "scale": -0.2705094869167766,
+  "yaw_offset": -55.56446532378772,
+  "calibration_segment": "frame_0_80",
+  "validation_segment": "frame_81_153",
+  "selected_by": "lowest_validation_yaw_mae",
+  "candidate_models": {
+    "offset_only": {
+      "model_type": "offset_only",
+      "scale": 1.0,
+      "yaw_offset": 10.13899614585879,
+      "calibration_mae": 23.81862074507328,
+      "validation_mae": 51.37465640521091,
+      "all_mae": 36.880897389164495
+    },
+    "linear": {
+      "model_type": "linear",
+      "scale": -0.2705094869167766,
+      "yaw_offset": -55.56446532378772,
+      "calibration_mae": 11.939159806697416,
+      "validation_mae": 30.89564379688302,
+      "all_mae": 20.92502559425293
+    }
+  }
+}

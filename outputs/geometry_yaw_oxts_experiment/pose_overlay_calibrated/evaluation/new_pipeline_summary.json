@@ -1,0 +1,28 @@
+{
+  "comparison_type": "geometry_single_frame_yaw_vs_oxts_absolute_heading",
+  "calibrated_pose": false,
+  "comparison_warning": "not_same_coordinate_semantics",
+  "total_rows": 154,
+  "yaw_mae_before": 34.35167749615055,
+  "yaw_mae_after": 34.35167749615055,
+  "frame_91_100_yaw_mae_before": 7.083523085202495,
+  "frame_91_100_yaw_mae_after": 7.083523085202495,
+  "pitch_mae": 1.3891192120892466,
+  "roll_mae": 1.522762753894398,
+  "confidence_failure_before": 17,
+  "confidence_failure_after": 17,
+  "frame_91_100_failure_before": 0,
+  "frame_91_100_failure_after": 0,
+  "phase_status": {
+    "Phase 1": "pass",
+    "Phase 2": "pass",
+    "Phase 3": "pass",
+    "Phase 4": "pass",
+    "Phase 5": "pass"
+  },
+  "notes": [
+    "Before metrics come from baseline_copy when present; after metrics come from the current video_pose evaluation.",
+    "The confidence gate uses VP side, ambiguity, temporal jump, and line-support warnings.",
+    "Pitch and roll are reported from the unchanged baseline comparison for regression visibility."
+  ]
+}

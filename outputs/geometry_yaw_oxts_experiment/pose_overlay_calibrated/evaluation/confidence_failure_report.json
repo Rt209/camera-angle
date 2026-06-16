@@ -1,0 +1,57 @@
+{
+  "thresholds": {
+    "high_confidence": 0.85,
+    "high_abs_yaw_error_deg": 30.0,
+    "high_cluster_ambiguity": 0.55,
+    "large_temporal_jump_px": 120.0
+  },
+  "confidence_failure_before": 17,
+  "confidence_failure_after": 17,
+  "frame_91_100_failure_before": 0,
+  "frame_91_100_failure_after": 0,
+  "failure_frames_before": [
+    114,
+    116,
+    117,
+    118,
+    119,
+    122,
+    123,
+    124,
+    136,
+    137,
+    138,
+    139,
+    140,
+    145,
+    149,
+    152,
+    153
+  ],
+  "failure_frames_after": [
+    114,
+    116,
+    117,
+    118,
+    119,
+    122,
+    123,
+    124,
+    136,
+    137,
+    138,
+    139,
+    140,
+    145,
+    149,
+    152,
+    153
+  ],
+  "warning_frame_counts": {
+    "high_cluster_ambiguity": 124,
+    "large_temporal_jump": 46,
+    "low_line_support_consistency": 60,
+    "vp_side_flip": 106,
+    "yaw_sign_reference_flip": 97
+  }
+}

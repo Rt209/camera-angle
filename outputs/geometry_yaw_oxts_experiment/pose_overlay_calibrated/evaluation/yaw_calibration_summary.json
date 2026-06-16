@@ -1,0 +1,98 @@
+{
+  "selected_model": {
+    "model_type": "linear",
+    "scale": -0.2705094869167766,
+    "yaw_offset": -55.56446532378772,
+    "calibration_segment": "frame_0_80",
+    "validation_segment": "frame_81_153",
+    "selected_by": "lowest_validation_yaw_mae",
+    "candidate_models": {
+      "offset_only": {
+        "model_type": "offset_only",
+        "scale": 1.0,
+        "yaw_offset": 10.13899614585879,
+        "calibration_mae": 23.81862074507328,
+        "validation_mae": 51.37465640521091,
+        "all_mae": 36.880897389164495
+      },
+      "linear": {
+        "model_type": "linear",
+        "scale": -0.2705094869167766,
+        "yaw_offset": -55.56446532378772,
+        "calibration_mae": 11.939159806697416,
+        "validation_mae": 30.89564379688302,
+        "all_mae": 20.92502559425293
+      }
+    }
+  },
+  "offset_only_metrics": {
+    "model_type": "offset_only",
+    "scale": 1.0,
+    "yaw_offset": 10.13899614585879,
+    "calibration_mae": 23.81862074507328,
+    "validation_mae": 51.37465640521091,
+    "all_mae": 36.880897389164495
+  },
+  "linear_metrics": {
+    "model_type": "linear",
+    "scale": -0.2705094869167766,
+    "yaw_offset": -55.56446532378772,
+    "calibration_mae": 11.939159806697416,
+    "validation_mae": 30.89564379688302,
+    "all_mae": 20.92502559425293
+  },
+  "segments": {
+    "all": {
+      "current_yaw_mae": 34.35167749615055,
+      "calibrated_yaw_mae": 20.92502559425293,
+      "raw_image_geometry_yaw_mae": 77.15534490751696,
+      "confidence_failure_before": 17,
+      "confidence_failure_after": 0
+    },
+    "calibration_0_80": {
+      "current_yaw_mae": 24.848517339009685,
+      "calibrated_yaw_mae": 11.939159806697416,
+      "raw_image_geometry_yaw_mae": 74.67335065873506,
+      "confidence_failure_before": 0,
+      "confidence_failure_after": 0
+    },
+    "validation_81_153": {
+      "current_yaw_mae": 44.896279862293156,
+      "calibrated_yaw_mae": 30.89564379688302,
+      "raw_image_geometry_yaw_mae": 79.90933852602839,
+      "confidence_failure_before": 17,
+      "confidence_failure_after": 0
+    },
+    "frame_91_100": {
+      "current_yaw_mae": 7.083523085202495,
+      "calibrated_yaw_mae": 16.543401617247998,
+      "raw_image_geometry_yaw_mae": 113.484571617248,
+      "confidence_failure_before": 0,
+      "confidence_failure_after": 0
+    },
+    "frame_112_117": {
+      "current_yaw_mae": 75.22281008083604,
+      "calibrated_yaw_mae": 28.712860080836037,
+      "raw_image_geometry_yaw_mae": 77.00614341416937,
+      "confidence_failure_before": 3,
+      "confidence_failure_after": 0
+    },
+    "frame_150_153": {
+      "current_yaw_mae": 70.99910939752851,
+      "calibrated_yaw_mae": 31.573309397528522,
+      "raw_image_geometry_yaw_mae": 70.99910939752851,
+      "confidence_failure_before": 2,
+      "confidence_failure_after": 0
+    }
+  },
+  "confidence_failure_before": 17,
+  "confidence_failure_after": 0,
+  "high_confidence_high_error_frames_after": [],
+  "calibration_transform_status": "success",
+  "success_criteria": {
+    "validation_mae_improved": true,
+    "confidence_failure_reduced": true,
+    "frame_112_117_improved": true,
+    "frame_150_153_improved": true
+  }
+}

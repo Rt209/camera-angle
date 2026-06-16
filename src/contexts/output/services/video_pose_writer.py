@@ -38,6 +38,18 @@ CSV_COLUMNS = [
     "selected_horizon_y_at_center",
     "selected_vanishing_point_x",
     "selected_vanishing_point_y",
+    "raw_vp_yaw",
+    "image_geometry_yaw",
+    "calibrated_heading_yaw",
+    "comparison_ready",
+    "pose_semantics",
+    "vp_temporal_jump",
+    "vp_side_flip",
+    "vp_cluster_ambiguity",
+    "line_support_consistency",
+    "selected_cluster_id",
+    "second_best_cluster_id",
+    "yaw_warning_flags",
 ]
 
 
@@ -62,6 +74,7 @@ def write_pose_timeline_csv(results: list[SerializableFrameResult], output_path:
         for result in results:
             row = result.to_timeline_row()
             row["warnings"] = json.dumps(row.get("warnings") or [], ensure_ascii=True)
+            row["yaw_warning_flags"] = json.dumps(row.get("yaw_warning_flags") or [], ensure_ascii=True)
             writer.writerow({column: row.get(column) for column in CSV_COLUMNS})
 
 

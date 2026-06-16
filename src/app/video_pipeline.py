@@ -9,6 +9,7 @@ import numpy as np
 
 from src.app.pipeline import PoseIntegrationPipelineResult, run_stage_4_7_pose_pipeline_on_frame
 from src.contexts.input.adapters.video_source import FrameSamplingConfig, VideoMetadata, VideoSource
+from src.contexts.pose_estimation.services.yaw_reliability_gate import apply_video_yaw_reliability
 from src.contexts.output.services.video_pose_writer import (
     write_frame_results_json,
     write_pose_timeline_csv,
@@ -84,13 +85,14 @@ class VideoPoseFrameResult:
         pitch = self.pose_result.get("pitch")
         roll = self.pose_result.get("roll")
         angle_confidence = self.pose_result.get("angle_confidence") or {}
+        yaw_reliability = self.feature_metadata.get("yaw_reliability") or {}
         return {
             "frame_index": self.frame_index,
             "time_sec": round(self.time_sec, 6),
             "yaw": yaw,
             "pitch": pitch,
             "roll": roll,
-            "raw_yaw": yaw,
+            "raw_yaw": yaw_reliability.get("raw_vp_yaw", yaw),
             "raw_pitch": pitch,
             "raw_roll": roll,
             "smoothed_yaw": None,
@@ -103,6 +105,7 @@ class VideoPoseFrameResult:
             "status": self.status,
             "warnings": self.warnings,
             **_timeline_feature_columns(self.feature_metadata),
+            **_timeline_yaw_reliability_columns(yaw_reliability),
         }
 
     def to_dict(self) -> dict[str, Any]:
@@ -169,6 +172,8 @@ def run_video_pose_pipeline(
                     f"{type(exc).__name__}: {exc}",
                 )
             )
+
+    apply_video_yaw_reliability(frame_results, source.metadata.width)
 
     if not debug_sampled_frames and debug_root.exists():
         _remove_debug_artifacts_from_results(frame_results)
@@ -237,6 +242,23 @@ def _timeline_feature_columns(feature_metadata: dict[str, Any]) -> dict[str, Any
         "selected_horizon_y_at_center": selected_horizon.get("y_at_center"),
         "selected_vanishing_point_x": selected_vp.get("x"),
         "selected_vanishing_point_y": selected_vp.get("y"),
+        "selected_cluster_id": vp.get("selected_cluster_id"),
+        "second_best_cluster_id": vp.get("second_best_cluster_id"),
+    }
+
+
+def _timeline_yaw_reliability_columns(yaw_reliability: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "raw_vp_yaw": yaw_reliability.get("raw_vp_yaw"),
+        "image_geometry_yaw": yaw_reliability.get("image_geometry_yaw"),
+        "calibrated_heading_yaw": yaw_reliability.get("calibrated_heading_yaw"),
+        "comparison_ready": yaw_reliability.get("comparison_ready"),
+        "pose_semantics": yaw_reliability.get("pose_semantics"),
+        "vp_temporal_jump": yaw_reliability.get("vp_temporal_jump"),
+        "vp_side_flip": yaw_reliability.get("vp_side_flip"),
+        "vp_cluster_ambiguity": yaw_reliability.get("vp_cluster_ambiguity"),
+        "line_support_consistency": yaw_reliability.get("line_support_consistency"),
+        "yaw_warning_flags": yaw_reliability.get("yaw_warning_flags"),
     }
 
 
