@@ -10,7 +10,7 @@ from typing import Any
 
 import cv2
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -22,7 +22,7 @@ from src.contexts.motion_analysis.domain.flow_track import FlowVector  # noqa: E
 from src.contexts.motion_analysis.services.sparse_flow_tracker import SparseFlowTrackerConfig  # noqa: E402
 from src.contexts.output.services.motion_debug_visualizer import draw_flow_vectors  # noqa: E402
 from src.contexts.output.services.optical_flow_pose_visualizer import draw_uncalibrated_pose_overlay  # noqa: E402
-from tools.evaluate_uncalibrated_pose_overlay_against_oxts import run_evaluation  # noqa: E402
+from tools.evaluation.evaluate_uncalibrated_pose_overlay_against_oxts import run_evaluation  # noqa: E402
 
 
 OUTLIER_FRAMES = [34, 35, 38, 73, 76, 77, 79, 80, 86, 97, 101, 103, 117, 118, 119]

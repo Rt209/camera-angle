@@ -128,7 +128,7 @@ frames/frame_000117_pose_overlay.png
 ### 4.2 指令
 
 ```bash
-python tools/analyze_optical_flow_paths.py ^
+python tools/optical_flow/analyze_optical_flow_paths.py ^
   --video tools/output/kitti_no_overlay.mp4 ^
   --debug-dir outputs/optical_flow_pose/sparse_flow ^
   --frame-step 1 ^
@@ -137,7 +137,7 @@ python tools/analyze_optical_flow_paths.py ^
 ```
 
 ```bash
-python tools/write_uncalibrated_pose_overlay.py ^
+python tools/optical_flow/write_uncalibrated_pose_overlay.py ^
   --video tools/output/kitti_no_overlay.mp4 ^
   --debug-dir outputs/optical_flow_pose/pose_overlay_uncalibrated ^
   --max-debug-frames 120 ^
@@ -145,7 +145,7 @@ python tools/write_uncalibrated_pose_overlay.py ^
 ```
 
 ```bash
-python tools/evaluate_uncalibrated_pose_overlay_against_oxts.py ^
+python tools/evaluation/evaluate_uncalibrated_pose_overlay_against_oxts.py ^
   --pose-json outputs/optical_flow_pose/pose_overlay_uncalibrated/frame_pose_results.json ^
   --oxts-dir tools/input/oxts ^
   --output-dir outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation

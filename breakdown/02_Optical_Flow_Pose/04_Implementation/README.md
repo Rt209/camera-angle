@@ -143,10 +143,10 @@ debug/experiments/optical_flow_pose/
 第一版 tools：
 
 ```bash
-python tools/analyze_optical_flow_paths.py --video tools/output/kitti_no_overlay.mp4 --debug-dir outputs/optical_flow_pose/sparse_flow
-python tools/write_uncalibrated_pose_overlay.py --video tools/output/kitti_no_overlay.mp4 --debug-dir outputs/optical_flow_pose/pose_overlay_uncalibrated
-python tools/evaluate_uncalibrated_pose_overlay_against_oxts.py --pose-json outputs/optical_flow_pose/pose_overlay_uncalibrated/frame_pose_results.json --oxts-dir tools/input/oxts --output-dir outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation
-python tools/debug_optical_flow_pose_parameters.py --video tools/output/kitti_no_overlay.mp4 --oxts-dir tools/input/oxts --output-root outputs/optical_flow_pose/parameter_debug --debug-root debug/experiments/optical_flow_pose
+python tools/optical_flow/analyze_optical_flow_paths.py --video tools/output/kitti_no_overlay.mp4 --debug-dir outputs/optical_flow_pose/sparse_flow
+python tools/optical_flow/write_uncalibrated_pose_overlay.py --video tools/output/kitti_no_overlay.mp4 --debug-dir outputs/optical_flow_pose/pose_overlay_uncalibrated
+python tools/evaluation/evaluate_uncalibrated_pose_overlay_against_oxts.py --pose-json outputs/optical_flow_pose/pose_overlay_uncalibrated/frame_pose_results.json --oxts-dir tools/input/oxts --output-dir outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation
+python tools/optical_flow/debug_optical_flow_pose_parameters.py --video tools/output/kitti_no_overlay.mp4 --oxts-dir tools/input/oxts --output-root outputs/optical_flow_pose/parameter_debug --debug-root debug/experiments/optical_flow_pose
 ```
 
 整合 pipeline：

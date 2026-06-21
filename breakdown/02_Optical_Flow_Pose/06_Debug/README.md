@@ -54,7 +54,7 @@ outputs/optical_flow_pose/parameter_debug/evaluation_report.md
 ## 4. Debug 指令
 
 ```powershell
-python tools/debug_optical_flow_pose_parameters.py ^
+python tools/optical_flow/debug_optical_flow_pose_parameters.py ^
   --video tools/output/kitti_no_overlay.mp4 ^
   --oxts-dir tools/input/oxts ^
   --output-root outputs/optical_flow_pose/parameter_debug ^

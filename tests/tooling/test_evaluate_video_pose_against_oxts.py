@@ -3,7 +3,7 @@ import csv
 import json
 import math
 
-from tools.evaluate_video_pose_against_oxts import (
+from tools.evaluation.evaluate_video_pose_against_oxts import (
     build_summary,
     build_worst_frames,
     evaluate_rows,
@@ -11,7 +11,7 @@ from tools.evaluate_video_pose_against_oxts import (
     run_evaluation,
     write_evaluation_outputs,
 )
-from tools.kitti_pose_video import PoseAngles, load_poses
+from tools.dataset.kitti_pose_video import PoseAngles, load_poses
 
 
 def _write_pose_csv(path: Path) -> None:

@@ -30,10 +30,10 @@ pose_for_debug_only
 第一個 milestone 是建立 sparse flow、uncalibrated pose overlay 與參數 debug tools：
 
 ```text
-tools/analyze_optical_flow_paths.py
-tools/write_uncalibrated_pose_overlay.py
-tools/evaluate_uncalibrated_pose_overlay_against_oxts.py
-tools/debug_optical_flow_pose_parameters.py
+tools/optical_flow/analyze_optical_flow_paths.py
+tools/optical_flow/write_uncalibrated_pose_overlay.py
+tools/evaluation/evaluate_uncalibrated_pose_overlay_against_oxts.py
+tools/optical_flow/debug_optical_flow_pose_parameters.py
 ```
 
 若未來取得可靠 calibration video 或 camera intrinsics file，可以把 intrinsics provider 升級成 calibrated K，但第一版不把它列為必要條件。

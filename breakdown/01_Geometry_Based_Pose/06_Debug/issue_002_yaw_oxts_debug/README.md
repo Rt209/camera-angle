@@ -289,7 +289,7 @@ yaw confidence 是否能偵測不穩定的 VP？
 
 ```bash
 python main.py --video tools/output/kitti_no_overlay.mp4 --sample-every 1 --output-dir outputs/video_pose --write-overlay
-python tools/evaluate_video_pose_against_oxts.py --pose-csv outputs/video_pose/pose_timeline.csv --oxts-dir tools/input/oxts --output-dir outputs/video_pose/evaluation
+python tools/evaluation/evaluate_video_pose_against_oxts.py --pose-csv outputs/video_pose/pose_timeline.csv --oxts-dir tools/input/oxts --output-dir outputs/video_pose/evaluation
 ```
 
 通過標準：

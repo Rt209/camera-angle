@@ -15,11 +15,11 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-ROOT_DIR = Path(__file__).resolve().parents[1]
+ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from tools.kitti_pose_video import PoseAngles, load_poses
+from tools.dataset.kitti_pose_video import PoseAngles, load_poses
 
 
 COMPARISON_COLUMNS = [
@@ -384,4 +384,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

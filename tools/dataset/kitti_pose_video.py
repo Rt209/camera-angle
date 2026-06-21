@@ -11,10 +11,10 @@ import cv2
 
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
-TOOL_DIR = Path(__file__).resolve().parent
-DEFAULT_IMAGE_DIR = TOOL_DIR / "input" / "images"
-DEFAULT_POSE_DIR = TOOL_DIR / "input" / "oxts"
-DEFAULT_OUTPUT_PATH = TOOL_DIR / "output" / "kitti_pose_overlay.mp4"
+TOOLS_DIR = Path(__file__).resolve().parents[1]
+DEFAULT_IMAGE_DIR = TOOLS_DIR / "input" / "images"
+DEFAULT_POSE_DIR = TOOLS_DIR / "input" / "oxts"
+DEFAULT_OUTPUT_PATH = TOOLS_DIR / "output" / "kitti_pose_overlay.mp4"
 
 
 @dataclass(frozen=True)

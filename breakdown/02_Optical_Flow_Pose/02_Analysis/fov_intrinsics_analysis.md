@@ -202,7 +202,7 @@ y_n = (v - c_y) / f_y
 若要做 calibrated K 升級，可新增：
 
 ```text
-tools/calibrate_camera_from_video.py
+tools/calibration/calibrate_camera_from_video.py
 ```
 
 輸入 calibration video，輸出：

@@ -46,7 +46,7 @@ pose_for_debug_only
 目前先從 sparse optical flow 與 uncalibrated pose overlay 開始：
 
 ```powershell
-python tools/analyze_optical_flow_paths.py ^
+python tools/optical_flow/analyze_optical_flow_paths.py ^
   --video tools/output/kitti_no_overlay.mp4 ^
   --debug-dir outputs/optical_flow_pose/sparse_flow ^
   --frame-step 1 ^
@@ -55,7 +55,7 @@ python tools/analyze_optical_flow_paths.py ^
 ```
 
 ```powershell
-python tools/write_uncalibrated_pose_overlay.py ^
+python tools/optical_flow/write_uncalibrated_pose_overlay.py ^
   --video tools/output/kitti_no_overlay.mp4 ^
   --debug-dir outputs/optical_flow_pose/pose_overlay_uncalibrated ^
   --max-debug-frames 120 ^
@@ -63,7 +63,7 @@ python tools/write_uncalibrated_pose_overlay.py ^
 ```
 
 ```powershell
-python tools/evaluate_uncalibrated_pose_overlay_against_oxts.py ^
+python tools/evaluation/evaluate_uncalibrated_pose_overlay_against_oxts.py ^
   --pose-json outputs/optical_flow_pose/pose_overlay_uncalibrated/frame_pose_results.json ^
   --oxts-dir tools/input/oxts ^
   --output-dir outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation
@@ -72,7 +72,7 @@ python tools/evaluate_uncalibrated_pose_overlay_against_oxts.py ^
 若要分析 outlier 與後續調參：
 
 ```powershell
-python tools/debug_optical_flow_pose_parameters.py ^
+python tools/optical_flow/debug_optical_flow_pose_parameters.py ^
   --video tools/output/kitti_no_overlay.mp4 ^
   --oxts-dir tools/input/oxts ^
   --output-root outputs/optical_flow_pose/parameter_debug ^

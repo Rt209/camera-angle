@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.contexts.motion_analysis.domain.flow_track import FlowVector
-from tools.debug_optical_flow_pose_parameters import (
+from tools.optical_flow.debug_optical_flow_pose_parameters import (
     PROJECT_ROOT,
     _frame_payload,
     _prepare_dir,

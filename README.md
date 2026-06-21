@@ -211,20 +211,20 @@ GitHub 預覽：
 
 說明：
 
-這支影片是由內建工具 `tools/kitti_pose_video.py` 將 `tools/input/images/` 的 KITTI 影像序列與 `tools/input/oxts/` 的官方 yaw / pitch / roll 姿態資料合成而來。
+這支影片是由內建工具 `tools/dataset/kitti_pose_video.py` 將 `tools/input/images/` 的 KITTI 影像序列與 `tools/input/oxts/` 的官方 yaw / pitch / roll 姿態資料合成而來。
 
 它的用途是人工對照與 debug reference。影片左上角會顯示 KITTI OXTS 官方姿態數值。
 
 可重新產生：
 
 ```bash
-python tools/kitti_pose_video.py --images tools/input/images --poses tools/input/oxts --output tools/output/kitti_pose_overlay.mp4
+python tools/dataset/kitti_pose_video.py --images tools/input/images --poses tools/input/oxts --output tools/output/kitti_pose_overlay.mp4
 ```
 
 如果要產生沒有文字 overlay 的輸入影片，可使用：
 
 ```bash
-python tools/kitti_pose_video.py --images tools/input/images --poses tools/input/oxts --output tools/output/kitti_no_overlay.mp4 --no-overlay
+python tools/dataset/kitti_pose_video.py --images tools/input/images --poses tools/input/oxts --output tools/output/kitti_no_overlay.mp4 --no-overlay
 ```
 
 注意：
@@ -317,7 +317,7 @@ tools/output/kitti_no_overlay.mp4
 可重新產生：
 
 ```bash
-python tools/write_uncalibrated_pose_overlay.py ^
+python tools/optical_flow/write_uncalibrated_pose_overlay.py ^
   --video tools/output/kitti_no_overlay.mp4 ^
   --debug-dir outputs/optical_flow_pose/pose_overlay_uncalibrated ^
   --max-debug-frames 120 ^
@@ -344,7 +344,7 @@ outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation/evaluation_report
 可重新產生：
 
 ```bash
-python tools/evaluate_uncalibrated_pose_overlay_against_oxts.py ^
+python tools/evaluation/evaluate_uncalibrated_pose_overlay_against_oxts.py ^
   --pose-json outputs/optical_flow_pose/pose_overlay_uncalibrated/frame_pose_results.json ^
   --oxts-dir tools/input/oxts ^
   --output-dir outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation
@@ -364,7 +364,7 @@ python tools/evaluate_uncalibrated_pose_overlay_against_oxts.py ^
 若只想檢查光流追蹤點與 flow vectors，可執行：
 
 ```bash
-python tools/analyze_optical_flow_paths.py ^
+python tools/optical_flow/analyze_optical_flow_paths.py ^
   --video tools/output/kitti_no_overlay.mp4 ^
   --debug-dir outputs/optical_flow_pose/sparse_flow ^
   --frame-step 1 ^
@@ -385,7 +385,7 @@ outputs/optical_flow_pose/sparse_flow/debug_frames/
 若要針對 outlier frame 做參數 debug，先建立 baseline 與 outlier frame deep dive：
 
 ```bash
-python tools/debug_optical_flow_pose_parameters.py ^
+python tools/optical_flow/debug_optical_flow_pose_parameters.py ^
   --video tools/output/kitti_no_overlay.mp4 ^
   --oxts-dir tools/input/oxts ^
   --output-root outputs/optical_flow_pose/parameter_debug ^

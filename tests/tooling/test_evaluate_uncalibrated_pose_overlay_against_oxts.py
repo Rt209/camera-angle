@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from tools.evaluate_uncalibrated_pose_overlay_against_oxts import build_summary, evaluate_rows
-from tools.kitti_pose_video import PoseAngles
+from tools.evaluation.evaluate_uncalibrated_pose_overlay_against_oxts import build_summary, evaluate_rows
+from tools.dataset.kitti_pose_video import PoseAngles
 
 
 def test_uncalibrated_pose_evaluation_compares_oxts_frame_delta() -> None:
@@ -34,4 +34,3 @@ def test_uncalibrated_pose_evaluation_compares_oxts_frame_delta() -> None:
     assert rows[0]["pitch_error"] == 0.0
     assert summary["comparison_type"] == "predicted_frame_to_frame_relative_rotation_vs_oxts_frame_to_frame_delta"
     assert summary["calibrated_pose_result"] is False
-

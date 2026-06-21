@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from tools.kitti_pose_video import list_images, load_poses, parse_pose_text
+from tools.dataset.kitti_pose_video import list_images, load_poses, parse_pose_text
 
 
 def test_parse_kitti_oxts_pose_radians_to_degrees() -> None:

@@ -113,7 +113,7 @@ outlier_ratio
 建議新增：
 
 ```text
-tools/analyze_optical_flow_paths.py
+tools/optical_flow/analyze_optical_flow_paths.py
 ```
 
 第一版只需要做到：
