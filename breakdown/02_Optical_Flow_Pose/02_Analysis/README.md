@@ -1,29 +1,31 @@
 # Optical Flow Pose Analysis
 
-## 1. 目的
+## 1. 文件目的
 
-本文件負責整理「若要完成 Optical Flow Pose 這個主題，需要拆成哪些分析架構與模組」。Analysis 階段不直接決定程式檔案怎麼切，而是先定義問題邊界、資料流、可用工具與最後流程。
+這份文件回答四個問題：
 
-目前主決策與上層 `breakdown/02_Optical_Flow_Pose/README.md` 對齊：
+1. 要從影片估計攝影機姿態，系統需要哪些模組？
+2. 每個模組有哪些技術可以選？
+3. 第一版建議使用哪些工具？為什麼？怎麼用？
+4. 這些模組如何串成一條完整流程？
 
-- 第一版不假設一定有 chessboard / Charuco calibration video。
-- 主流程使用 approximate camera intrinsics。
-- 所有姿態結果都必須標示為 debug / relative pose，不宣稱 calibrated absolute pose。
-- 若未來取得可靠 calibration result，Design 可以把 `A2 Intrinsics Model` 升級為 calibrated K，但不改動其他主架構。
+Analysis 階段先整理「需要解決哪些問題」與「有哪些做法」，不在這裡決定程式檔案要怎麼切。真正的類別、介面與檔案配置，留到 Design 階段定義。
 
-第一版 approximate K：
+> **重要說明：** 本專案目前不假設一定有棋盤格或 Charuco 校正影片。第一版使用 approximate camera intrinsics，因此結果只能視為 **frame-to-frame relative pose 的除錯參考**，不能宣稱是經過校正的絕對姿態。
+
+第一版使用的近似相機內參：
 
 ```text
-f = max(width, height)
+f  = max(width, height)
 cx = width / 2
 cy = height / 2
-K =
-| f   0  cx |
-| 0   f  cy |
-| 0   0   1 |
+
+K = | f  0  cx |
+    | 0  f  cy |
+    | 0  0   1 |
 ```
 
-輸出必須包含：
+所有姿態輸出都必須帶上以下警告：
 
 ```text
 intrinsics_not_calibrated
@@ -31,331 +33,320 @@ approximate_K_used
 pose_for_debug_only
 ```
 
-## 2. Analysis 架構總覽
+---
 
-| ID | 分析架構 | 分析重點 | Design 對應 |
+## 2. 完成目標所需的系統模組
+
+整個系統可拆成九個模組。前六個模組負責「從影片算出姿態」，後三個模組負責「把結果說清楚並確認是否可信」。
+
+| ID | 系統模組 | 要解決的問題 | 主要輸出 |
 |---|---|---|---|
-| A1 | Video Input Analysis | 定義影片讀取、抽幀策略與時間資訊保存方式 | D1 Video IO |
-| A2 | Intrinsics Model Analysis | 定義沒有 calibration 時 approximate K 的建立方式與可信度標記 | D2 Intrinsics Provider |
-| A3 | Frame Preprocessing Analysis | 定義 frame 灰階化、縮放與影像穩定化處理 | D3 Preprocessor |
-| A4 | Feature / Optical Flow Analysis | 定義可追蹤特徵點選擇與 sparse optical flow 估計方式 | D4 Tracker |
-| A5 | Track Filtering Analysis | 定義 tracks 保留條件、outlier 移除與動態物體污染處理 | D5 Track Filter |
-| A6 | Geometry / Pose Analysis | 定義由 2D correspondences 估計 frame-to-frame relative pose 的方法 | D6 Geometry Solver |
-| A7 | Angle / Motion Output Analysis | 定義 yaw / pitch / roll 與 frame-to-frame motion 的輸出格式 | D7 Pose Formatter |
-| A8 | Debug / Visualization Analysis | 定義結果檢查、參數調整與 overlay 回放方式 | D8 Debug Renderer |
-| A9 | Verification Analysis | 定義 debug pose 穩定性判斷與可信度限制 | D9 Verification |
+| A1 | 影片輸入與輸出 | 如何穩定讀取影片、保存時間資訊，並寫出結果影片？ | 影格、影格編號、時間戳、輸出影片 |
+| A2 | 相機內參 | 如何提供幾何計算需要的 `K`？內參不準時如何標記風險？ | `K`、內參來源、可信度、警告 |
+| A3 | 影像前處理 | 如何把每張影格整理成適合追蹤的影像？ | 灰階影像、縮放資訊 |
+| A4 | 特徵與 Optical Flow | 如何找到可追蹤的點，並知道它們在下一幀移到哪裡？ | 前後幀對應點、LK 狀態與誤差 |
+| A5 | 軌跡品質過濾 | 如何排除追蹤失敗、跳動過大或不合理的點？ | 過濾後的 2D 對應點 |
+| A6 | 幾何與姿態估計 | 如何從 2D 對應點求出相機的相對旋轉與平移方向？ | `E`、`R`、`t`、inlier mask |
+| A7 | 角度與動作輸出 | 如何把旋轉矩陣轉成容易閱讀的 yaw、pitch、roll？ | 每幀 pose record |
+| A8 | 除錯與視覺化 | 如何讓人一眼看出追蹤點、內外點與姿態是否合理？ | Overlay 影片、除錯影格、JSON / CSV |
+| A9 | 驗證與品質判讀 | 如何用數據判斷結果穩不穩，而不是只靠肉眼？ | 統計指標、圖表、驗證報告 |
 
-## 3. 模組分析
+### 2.1 模組之間交換的資料
 
-### A1. Video Input Analysis
+| 從哪個模組 | 傳到哪個模組 | 交換內容 | 白話說明 |
+|---|---|---|---|
+| A1 | A2、A3 | 影格、解析度、時間資訊 | 先知道影像多大、目前是哪一幀 |
+| A2 | A6、A8 | `K`、來源、警告 | 幾何計算要用 `K`，畫面也要顯示其可信度 |
+| A3 | A4 | 灰階影像、縮放比例 | 提供較適合追蹤的影像 |
+| A4 | A5 | 前後幀座標、狀態、誤差 | 告訴過濾器哪些點追到了哪裡 |
+| A5 | A6、A8 | 有效對應點、過濾結果 | 只把較可信的點送去估姿態，並保留資料供畫圖 |
+| A6 | A7、A8 | `R`、`t`、inlier mask | 轉成角度，同時標出哪些點符合幾何模型 |
+| A7 | A8、A9 | yaw、pitch、roll、狀態與警告 | 顯示在影片上，也交給驗證模組分析 |
+| A8 | A9 | Overlay metadata、逐幀紀錄 | 讓驗證結果能回頭找到對應影格 |
 
-目標是把 pose video 轉成穩定的 frame sequence，並保留 `frame_index`、`timestamp_sec`、`fps`、`width`、`height`。
+### 2.2 系統模組流程圖
 
-需要確認：
+下圖用模組層級呈現完整方向：先從影片取得影格與相機內參，再追蹤特徵點、過濾不可靠的軌跡、估計姿態，最後產生容易閱讀與驗證的成果。
 
-- 是否逐幀處理，或每 N 幀取樣。
-- 是否限制最大分析幀數，避免 debug 階段輸出過多。
-- 輸出 overlay video 時是否保持原始 fps。
-
-### A2. Intrinsics Model Analysis
-
-第一版使用 approximate K，因為目前不假設會有 calibration video。
-
-需要確認：
-
-- `K` 是否根據實際處理解析度建立。
-- 若 frame resize，`cx`、`cy`、`f` 必須跟著處理後解析度走。
-- 所有 pose JSON、evaluation report、overlay 都要輸出 warning。
-
-未來可升級路線：
-
-| 模式 | 來源 | 信任等級 | 備註 |
-|---|---|---:|---|
-| approximate K | `f=max(width,height)` | 低 | 第一版 debug 主流程 |
-| FOV-derived K | 使用者或資料集提供 FOV | 中低 | 只能當 fallback |
-| calibrated K | calibration video / camera intrinsics file | 高 | 後續正式 pose pipeline |
-
-### A3. Frame Preprocessing Analysis
-
-目標是提供穩定的 tracking input。
-
-建議處理：
-
-- BGR frame 轉 grayscale。
-- 可選擇 resize 到固定寬度，加速 optical flow。
-- 可選擇 histogram equalization 或 CLAHE，但第一版先保持簡單。
-- 若有 calibrated intrinsics 才做 undistort；approximate K 不做 lens correction。
-
-### A4. Feature / Optical Flow Analysis
-
-第一版建議使用 sparse optical flow：
-
-```text
-Shi-Tomasi features
--> Pyramidal Lucas-Kanade optical flow
+```mermaid
+flowchart TD
+    INPUT[輸入影片] --> A1[A1 影片輸入與輸出]
+    A1 -->|解析度| A2[A2 相機內參]
+    A1 -->|影格| A3[A3 影像前處理]
+    A3 -->|灰階影格| A4[A4 特徵與 Optical Flow]
+    A4 -->|前後幀對應點| A5[A5 軌跡品質過濾]
+    A2 -->|相機內參 K| A6[A6 幾何與姿態估計]
+    A5 -->|有效對應點| A6
+    A6 -->|旋轉 R 與平移方向 t| A7[A7 角度與動作輸出]
+    A2 -->|內參警告| A8[A8 除錯與視覺化]
+    A5 -->|追蹤點與過濾結果| A8
+    A7 -->|yaw、pitch、roll| A8
+    A8 -->|逐幀紀錄| A9[A9 驗證與品質判讀]
+    A8 --> VIDEO[Overlay 影片]
+    A9 --> REPORT[統計圖表與驗證報告]
 ```
 
-原因：
+---
 
-- OpenCV 內建，工程風險低。
-- 可以追蹤 feature ID 與路徑，方便 debug。
-- 比 dense flow 更容易接 Essential Matrix / recoverPose。
+## 3. 各模組可使用的技術
 
-核心公式：
+這一節列出每個模組的候選技術。表中的「第一版定位」是目前建議，不代表其他技術已經實作。
+
+### A1. 影片輸入與輸出
+
+| 技術 | 適合情境 | 優點 | 注意事項 | 第一版定位 |
+|---|---|---|---|---|
+| OpenCV `VideoCapture` / `VideoWriter` | Python 逐幀影像處理 | API 簡單，能直接接 OpenCV pipeline | Codec 支援會受執行環境影響 | **主方案** |
+| FFmpeg CLI | 轉檔、抽幀、修復或壓縮影片 | 格式支援完整、批次處理能力強 | 需要額外安裝，並管理命令與中介檔案 | 輔助方案 |
+| MoviePy | 簡單剪輯、加音訊或組合片段 | Python API 容易理解 | 不適合當高效逐幀 vision 主流程 | 非主方案 |
+
+### A2. 相機內參
+
+| 技術 | 適合情境 | 優點 | 注意事項 | 第一版定位 |
+|---|---|---|---|---|
+| Approximate `K` | 沒有校正資料，只需快速建立 prototype | 不需要額外輸入，能先跑通流程 | 誤差不可控，不能當正式 calibrated pose | **主方案** |
+| FOV-derived `K` | 已知可靠的水平或垂直 FOV | 比單純用解析度猜焦距更有依據 | FOV 填錯、裁切或縮放都會影響結果 | Fallback |
+| `cv2.calibrateCamera` | 有棋盤格校正影像 | 可得到 `K`、畸變係數與重投影誤差 | 需要品質良好且同鏡頭設定的校正資料 | 後續升級 |
+| Charuco calibration | 場景容易遮住部分校正板 | 對部分遮擋通常比純棋盤格有彈性 | 設定與偵測流程較多 | 後續升級 |
+| 已知 intrinsics JSON | 相機已完成校正 | 可直接使用可靠內參 | 解析度、焦段、對焦與裁切設定必須一致 | 優先升級方案 |
+
+> **注意：** 如果影像有 resize，`fx`、`fy`、`cx`、`cy` 也必須用相同比例縮放；不能直接沿用原解析度的 `K`。
+
+### A3. 影像前處理
+
+| 技術 | 適合情境 | 優點 | 注意事項 | 第一版定位 |
+|---|---|---|---|---|
+| 灰階化 `cv2.cvtColor` | Corner detection 與 LK tracking | 計算量較低，也是 LK 的標準輸入 | 顏色資訊不再參與追蹤 | **主方案** |
+| `cv2.resize` | 原始解析度太大、處理速度不足 | 可明顯降低計算量 | 必須同步更新 `K` | 可選 |
+| Gaussian blur | 影像有細碎雜訊 | 能減少部分雜訊干擾 | 模糊太強會把好角點一起抹掉 | 視場景啟用 |
+| CLAHE | 低光、局部對比不足 | 可讓暗部出現更多可追蹤紋理 | 也可能放大雜訊 | 視場景評估 |
+| Undistort | 已有可靠 `K` 與畸變係數 | 可修正鏡頭變形，提升幾何一致性 | Approximate `K` 無法可靠完成這一步 | 僅 calibrated 模式 |
+
+### A4. 特徵與 Optical Flow
+
+| 技術 | 做法 | 優點 | 注意事項 | 第一版定位 |
+|---|---|---|---|---|
+| Shi-Tomasi + Pyramidal LK | 找角點，再逐幀追蹤 | 快、可保留點的 ID 與路徑，容易除錯 | 大位移、低紋理、模糊時容易追丟 | **主方案** |
+| ORB matching | 偵測 keypoint 並比對二進位 descriptor | 可處理重新偵測與較大位移 | 誤配較多，需要額外 ratio test / RANSAC | Fallback |
+| SIFT matching | 使用尺度與旋轉較穩定的 descriptor | 面對尺度變化通常比 ORB 穩 | 計算較慢 | 後續評估 |
+| Farneback dense flow | 計算幾乎每個 pixel 的 flow | 適合全畫面 motion heatmap | 不容易直接管理乾淨的姿態對應點 | 視覺化輔助 |
+| DIS dense flow | 較快速的 dense flow | 速度通常比傳統 dense 方法實用 | 接 pose 前仍要抽樣與過濾 | 後續評估 |
+| RAFT 等 learned flow | 用深度學習模型估 dense flow | 困難場景可能有更好 flow 品質 | 依賴模型與 GPU，系統複雜度高 | 不納入第一版 |
+
+### A5. 軌跡品質過濾
+
+| 技術 | 過濾什麼 | 優點 | 注意事項 | 第一版定位 |
+|---|---|---|---|---|
+| LK status + finite check | LK 已判定失敗或座標不是有限值的點 | 成本低，能先排除明顯錯誤 | 不能抓出所有誤追蹤 | **必要基線** |
+| LK error threshold | 誤差過高的點 | 可再移除不穩的 tracks | 門檻需依資料調整 | 建議加入 |
+| 位移上下限 | 跳太遠或幾乎不動的點 | 規則直觀、容易實作 | 快速運動時固定門檻可能誤殺好點 | 建議加入 |
+| 邊界過濾 | 太靠近或離開畫面的點 | 避免無效座標與邊緣不穩定 | 無法處理動態物體 | 建議加入 |
+| Forward-backward check | 前向追蹤後再反向追蹤，檢查是否回到原點 | 對誤追蹤很有效 | LK 計算量約增加一輪 | 品質升級 |
+| RANSAC inlier mask | 不符合整體相機幾何的點 | 能處理不少誤追蹤與動態物體 | 需要足夠且分布良好的對應點 | **必要基線** |
+
+### A6. 幾何與姿態估計
+
+| 技術 | 適合情境 | 優點 | 注意事項 | 第一版定位 |
+|---|---|---|---|---|
+| Essential Matrix + RANSAC | 有 `K`，估相鄰兩幀相對姿態 | 可直接接 `recoverPose` 得到 `R` 與 `t` 方向 | `K` 不準會影響結果；單眼 `t` 沒有真實尺度 | **主方案** |
+| Fundamental Matrix | 沒有可信 `K`，只分析 epipolar geometry | 不需要內參 | 不能直接得到經校正的相對 pose | 分析輔助 |
+| Homography | 平面場景或接近純旋轉 | 在適用場景可能比 Essential Matrix 穩 | 一般 3D 平移場景會失真 | 模型退化檢查 |
+| PnP | 已知 3D 點與其 2D 投影 | 能估相機相對於 3D 地圖的姿態 | 本專案第一版沒有已知 3D 點 | 不適合第一版 |
+| Bundle Adjustment | 多幀共同最佳化 | 可降低長序列誤差 | 實作與計算成本高，也需要良好初始值 | 後續研究 |
+
+幾何主線可簡化成：
 
 ```text
-dx = x_t+1 - x_t
-dy = y_t+1 - y_t
-speed_px_per_frame = sqrt(dx^2 + dy^2)
-direction_rad = atan2(dy, dx)
+2D correspondences + K
+        ↓
+Essential Matrix: E = [t]x R
+        ↓
+recoverPose
+        ↓
+relative rotation R + translation direction t
 ```
 
-### A5. Track Filtering Analysis
+### A7. 角度與動作輸出
 
-需要過濾掉不可靠 tracks，否則 pose 會被污染。
+| 技術 | 適合情境 | 優點 | 注意事項 | 第一版定位 |
+|---|---|---|---|---|
+| ZYX Euler angles | 顯示 yaw、pitch、roll | 人容易閱讀，適合 Overlay | 必須固定旋轉順序，且有 gimbal lock 問題 | **輸出主方案** |
+| Quaternion | 內部累積、內插與平滑 | 數值較穩定 | 不適合直接給一般使用者閱讀 | 後續內部表示 |
+| Rodrigues vector | 與 OpenCV 旋轉 API 交換資料 | 三個參數即可表示旋轉 | 物理意義不如 yaw / pitch / roll 直覺 | 內部輔助 |
+| 累積相對旋轉 | 觀察一段時間的轉向趨勢 | 比逐幀角度更容易看出方向 | 每幀誤差會一路累積而漂移 | Debug-only |
 
-主要條件：
-
-- LK status failed。
-- LK error 過高。
-- track 位移過大或過小。
-- track 離開畫面。
-- RANSAC 判定為 outlier。
-- 有大量 moving object 時，inlier ratio 下降並標記 warning。
-
-### A6. Geometry / Pose Analysis
-
-第一版仍可用 Essential Matrix + RANSAC 估計 frame-to-frame relative pose，但因為 `K` 是 approximate，所以結果只能當 debug。
+第一版固定採用：
 
 ```text
-E = [t]_x R
-x_2^T E x_1 = 0
+R = Rz(yaw) × Ry(pitch) × Rx(roll)
 ```
 
-建議方法：
+`t` 只表示平移方向，不輸出公尺、速度或真實距離。
 
-```text
-cv2.findEssentialMat(points1, points2, K, method=cv2.RANSAC)
-cv2.recoverPose(E, points1, points2, K)
-```
+### A8. 除錯與視覺化
 
-限制：
+| 技術 / 工具 | 用途 | 優點 | 注意事項 | 第一版定位 |
+|---|---|---|---|---|
+| OpenCV drawing APIs | 畫點、箭頭、inlier / outlier 與文字 | 能直接畫回影片影格 | 不適合複雜統計圖 | **Overlay 主方案** |
+| JSON | 保存完整逐幀欄位與警告 | 結構清楚、可擴充 | 檔案較大，不適合直接用試算表看 | **採用** |
+| CSV | 保存 pose timeline 與主要指標 | 容易用 Excel、Python 或 BI 工具分析 | 不適合巢狀資料 | **採用** |
+| Matplotlib | 畫 pose、inlier ratio 與 jitter 曲線 | 很適合報告與參數比較 | 不用來做即時影片 Overlay | 報告輔助 |
+| Markdown report | 整理設定、圖表與結論 | 方便版本控制與閱讀 | 需要額外產生報告的步驟 | 建議加入 |
 
-- 單眼 translation 沒有真實尺度。
-- approximate K 會讓 yaw / pitch / roll 有系統性誤差。
-- 純旋轉、低紋理、動態物體多的場景都會讓 pose 不穩。
+### A9. 驗證與品質判讀
 
-### A7. Angle / Motion Output Analysis
+| 指標 / 技術 | 回答的問題 | 注意事項 | 第一版定位 |
+|---|---|---|---|
+| Valid track count | 還有多少點可用？ | 點多不代表點一定正確 | **採用** |
+| Inlier count / ratio | 有多少點符合目前的相機幾何？ | 比例高仍不保證姿態絕對正確 | **採用** |
+| Median flow speed | 當前畫面移動量是否異常？ | 單位是 pixel/frame，不是真實速度 | **採用** |
+| Pose jitter | 靜止或平順片段是否出現不合理抖動？ | 真實快速轉動不能直接算成 jitter | **採用** |
+| Consecutive failures | Pipeline 是否連續多幀失敗？ | 需先定義何謂 failure | **採用** |
+| Warning distribution | 最常出現哪一類問題？ | Warning 名稱與觸發條件要固定 | **採用** |
+| OXTS 趨勢比較 | 估計轉動方向是否與外部參考一致？ | Approximate `K` 只能比較相對變化趨勢 | Debug reference |
 
-輸出應聚焦在 relative motion：
+---
 
-- frame-to-frame yaw / pitch / roll。
-- accumulated yaw / pitch / roll 可作 debug，但要標明會累積誤差。
-- `t` 只輸出 direction，不輸出真實距離。
+## 4. 第一版工具的 What / Why / How
 
-固定 rotation order：
+這一節把候選技術收斂成第一版建議工具。`What` 說要用什麼，`Why` 說選它的原因，`How` 說它在流程中怎麼使用。
 
-```text
-R = Rz(yaw) * Ry(pitch) * Rx(roll)
-```
+| ID | 小階段 | What：使用什麼？ | Why：為什麼使用？ | How：如何使用？ |
+|---|---|---|---|---|
+| A1.1 | 讀取影片 | OpenCV `cv2.VideoCapture` | 能直接逐幀讀取，並取得 fps、寬高等資訊 | 開啟影片後逐幀讀取；保存 `frame_index`，以 `frame_index / fps` 算時間戳 |
+| A1.2 | 寫出結果 | OpenCV `cv2.VideoWriter` | 可以把每張已標記的影格重新組成可回放影片 | 使用固定 codec、fps 與 frame size，逐幀寫入 annotated frame |
+| A2.1 | 建立近似內參 | NumPy 3×3 matrix | 即使沒有校正資料，也能先提供幾何估計所需的 `K` | 依處理後解析度建立 `f`、`cx`、`cy`，並一起輸出來源、可信度與警告 |
+| A3.1 | 灰階化 | `cv2.cvtColor` | Shi-Tomasi 與 LK 通常以單通道影像工作，速度較快 | 原始 BGR 留給 Overlay；轉出的 gray frame 交給偵測與追蹤 |
+| A3.2 | 選擇性縮放 | `cv2.resize` | 高解析影片可用較低成本快速驗證 pipeline | 使用固定比例縮放，並用相同比例更新或重建 `K` |
+| A4.1 | 偵測特徵點 | `cv2.goodFeaturesToTrack` | Shi-Tomasi 角點適合 LK 追蹤，參數少也容易除錯 | 第一幀或有效點不足時執行；調整 `maxCorners`、`qualityLevel`、`minDistance` |
+| A4.2 | 追蹤特徵點 | `cv2.calcOpticalFlowPyrLK` | Pyramidal LK 適合連續影片中的小到中等位移 | 輸入前後兩張灰階圖與上一幀的點，取得新座標、`status` 與 `error` |
+| A5.1 | 基本軌跡過濾 | NumPy boolean mask | 可以一次組合多個條件，快速移除壞點 | 合併 status、finite、LK error、位移與邊界條件；點太少就重新偵測 |
+| A6.1 | 穩健幾何估計 | `cv2.findEssentialMat` + RANSAC | 能在誤追蹤與動態物體存在時找出較一致的幾何模型 | 傳入過濾後的兩組點與 `K`，保存 `E`、inlier mask、數量與比例 |
+| A6.2 | 恢復相對姿態 | `cv2.recoverPose` | 能從 `E` 拆出 frame-to-frame 的 `R` 與 `t` 方向 | 只在有效點與 inlier 足夠時執行；不足時輸出 unreliable 狀態，不硬算角度 |
+| A7.1 | 轉成 Euler angles | NumPy `atan2`、`sqrt` | Overlay 與報告需要人容易閱讀的 yaw、pitch、roll | 固定 ZYX 順序，將 `R` 轉成 degree，並標明是 relative 或 accumulated |
+| A8.1 | 畫除錯 Overlay | `cv2.circle`、`arrowedLine`、`putText` | 能把 flow、內外點、pose 與 warning 直接畫回原畫面 | 使用固定顏色圖例；警告與 intrinsics 狀態要保持可見 |
+| A8.2 | 保存逐幀資料 | Python JSON / CSV | 影片適合觀看，結構化資料才適合搜尋與後續分析 | JSON 保存完整紀錄；CSV 保存時間、角度、點數、inlier ratio 等主要欄位 |
+| A9.1 | 產生驗證圖表 | Matplotlib | 能快速比較 pose、追蹤品質與失敗時段 | 從 JSON / CSV 讀取時間序列，畫角度、track count、inlier ratio 與 warning 統計 |
 
-### A8. Debug / Visualization Analysis
+### 4.1 第一版成功與失敗的處理原則
 
-第一版必須讓使用者能看懂結果是否可信。
-
-建議輸出：
-
-| Artifact | 說明 |
+| 狀況 | 系統行為 |
 |---|---|
-| flow overlay | 畫出 tracked points 與 arrows |
-| inlier overlay | 區分 RANSAC inliers / outliers |
-| pose overlay video | 每幀顯示 relative yaw / pitch / roll |
-| frame pose JSON | 保存每幀 pose、inlier ratio、warnings |
-| parameter debug report | 比較不同 LK / RANSAC 參數 |
+| 有效 tracks 太少 | 不估 pose；重新偵測特徵點；輸出 `too_few_tracks` |
+| RANSAC inliers 太少 | 不呼叫或不採信 `recoverPose`；輸出 `too_few_inliers` |
+| `recoverPose` 失敗 | 保留上一筆顯示狀態，但本幀 pose 標為 invalid，不假造數值 |
+| 使用 approximate `K` | 每一筆 pose 與 Overlay 都保留 uncalibrated / debug-only 警告 |
+| 只得到單眼 `t` | 標示為 translation direction，不換算真實距離 |
+| 累積角度 | 額外標示 drift 風險，不把它稱為 absolute pose |
 
-### A9. Verification Analysis
+---
 
-Verification 的重點不是證明它是絕對正確，而是判斷 debug pose 是否穩定。
+## 5. Mermaid：模組與資料交換
 
-建議指標：
+這張圖先從模組層級說明 A1 到 A9 如何合作，以及彼此交換什麼資料。
 
-- valid track count。
-- inlier count。
-- inlier ratio。
-- median flow speed。
-- pose jitter。
-- consecutive failure count。
-- warning distribution。
+```mermaid
+flowchart LR
+    A1[A1 影片輸入與輸出] -->|BGR frame、時間、解析度| A3[A3 影像前處理]
+    A1 -->|width、height| A2[A2 相機內參]
+    A3 -->|gray frame、scale| A4[A4 特徵與 Optical Flow]
+    A4 -->|前後幀座標、status、error| A5[A5 軌跡品質過濾]
+    A2 -->|K、來源、warnings| A6[A6 幾何與姿態估計]
+    A5 -->|有效 2D correspondences| A6
+    A6 -->|R、t、inlier mask| A7[A7 角度與動作輸出]
+    A2 -->|內參狀態| A8[A8 除錯與視覺化]
+    A5 -->|tracks、過濾結果| A8
+    A7 -->|pose record| A8
+    A8 -->|annotated frames| A1
+    A8 -->|JSON、CSV、metadata| A9[A9 驗證與品質判讀]
+    A9 -->|metrics、plots、report| OUT[輸出成果]
+    A1 -->|overlay video| OUT
+```
 
-若要與 OXTS 或其他 ground truth 比較，只能比較變化趨勢，不直接宣稱 absolute yaw / pitch / roll 對齊。
+## 6. Mermaid：第一版完整處理流程
 
-## 4. 模組溝通與資料交換流程
-
-這一節先整理 A1 到 A9 模組之間的溝通方式。圖中的線代表上一個模組傳給下一個模組的資料型態，包含 runtime 變數、matrix、mask、JSON 與影片輸出。
+這張圖把第 4 節的工具放進實際執行順序，並補上 tracks 或 inliers 不足時的分支。
 
 ```mermaid
 flowchart TD
-    A1[A1 Video Input] -->|frame_packet: ndarray + frame_index + timestamp_sec + fps + size| A2[A2 Intrinsics Model]
-    A1 -->|bgr_frame: ndarray| A3[A3 Frame Preprocessing]
-    A2 -->|intrinsics_meta: json<br/>K: 3x3 ndarray<br/>warnings: list| A6[A6 Geometry / Pose]
-    A2 -->|intrinsics_meta: json| A8[A8 Debug / Visualization]
-    A3 -->|gray_frame: ndarray<br/>scale_meta: json| A4[A4 Feature / Optical Flow]
-    A4 -->|track_result: json<br/>points_prev: Nx2<br/>points_curr: Nx2<br/>status: Nx1<br/>error: Nx1| A5[A5 Track Filtering]
-    A5 -->|filtered_correspondences: json<br/>points1: Mx2 ndarray<br/>points2: Mx2 ndarray| A6
-    A6 -->|pose_raw: json<br/>E: 3x3 ndarray<br/>R: 3x3 ndarray<br/>t: 3x1 ndarray<br/>inlier_mask: Mx1| A7[A7 Angle / Motion Output]
-    A5 -->|tracks_for_overlay: json<br/>inliers/outliers mask| A8
-    A7 -->|pose_record: json<br/>yaw_pitch_roll: degree<br/>pose_type: relative<br/>warnings: list| A8
-    A8 -->|frame_pose_results.json<br/>overlay_metadata.json<br/>annotated_frame: ndarray| A9[A9 Verification]
-    A8 -->|pose_overlay_uncalibrated.mp4| OUT[Output Artifacts]
-    A9 -->|metrics_summary.json<br/>pose_timeline.csv<br/>report.md| OUT
+    IN[輸入影片] --> B[VideoCapture<br/>逐幀讀取]
+    B --> C[建立 approximate K<br/>加入 debug-only warnings]
+    B --> D[cvtColor<br/>BGR 轉灰階]
+    D --> E[goodFeaturesToTrack<br/>偵測 Shi-Tomasi 角點]
+    E --> F[calcOpticalFlowPyrLK<br/>追蹤到下一幀]
+    D --> F
+    F --> G[NumPy mask<br/>過濾 status、error、位移與邊界]
+    G --> H{有效 tracks 足夠？}
+    H -->|否| E
+    H -->|是| I[findEssentialMat + RANSAC<br/>估 E 與 inlier mask]
+    C --> I
+    I --> J{inliers 足夠？}
+    J -->|否| K[建立 unreliable pose record<br/>加入 warning]
+    J -->|是| L[recoverPose<br/>取得 R 與 t 方向]
+    L --> M[ZYX Euler conversion<br/>relative yaw、pitch、roll]
+    M --> N[OpenCV Overlay<br/>畫 flow、inlier、pose、warning]
+    K --> N
+    B --> N
+    G --> N
+    C --> N
+    N --> O[VideoWriter<br/>輸出 Overlay 影片]
+    N --> P[JSON / CSV<br/>保存逐幀資料]
+    P --> Q[Matplotlib<br/>產生品質與趨勢圖]
+    O --> OUT[輸出成果]
+    Q --> OUT
 ```
 
-## 5. 模組可用技術與工具比較
+## 7. 預期輸出成果
 
-### A1. Video Input / Output 技術
+| 成果 | 內容 | 用途 |
+|---|---|---|
+| Overlay video | Flow arrows、tracked points、inlier / outlier、pose、warning | 人工回放與快速檢查 |
+| Frame pose JSON | 完整逐幀 pose、品質數據、內參來源與警告 | 程式分析與問題追查 |
+| Pose timeline CSV | 時間、yaw、pitch、roll、點數、inlier ratio、狀態 | 試算表與時間序列分析 |
+| Debug frames | 指定幀的原圖與 Overlay | 定位單幀失敗原因 |
+| Verification plots | Pose、track count、inlier ratio、jitter、warning 統計 | 比較參數與判斷穩定性 |
+| Analysis report | 設定、限制、圖表與結論 | 保存實驗脈絡，交接到 Design / Verification |
 
-| 技術 / 工具 | 特性 | 優點 | 缺點 | 第一版建議 |
-|---|---|---|---|---|
-| OpenCV `VideoCapture` / `VideoWriter` | 直接處理常見影片格式 | 簡單、與 OpenCV tracking pipeline 整合最好 | codec 支援依環境而異 | 採用 |
-| FFmpeg CLI | 影片轉檔、抽幀、壓縮能力強 | 格式支援完整，適合批次前處理 | 需要額外指令與檔案中介 | 作為輔助工具 |
-| MoviePy | Python 影片剪輯與輸出 | API 直覺，適合簡單剪輯 | 對逐幀高效 vision pipeline 不如 OpenCV | 不作主流程 |
+建議的主要輸出位置：
 
-### A2. Intrinsics Model 技術
-
-| 技術 / 工具 | 特性 | 優點 | 缺點 | 第一版建議 |
-|---|---|---|---|---|
-| Approximate K + NumPy | 用解析度估 `f`、`cx`、`cy` | 不需要 calibration video，能快速建立 debug pipeline | 不可靠，無 lens distortion，pose 只能 debug | 採用 |
-| FOV-derived K | 用 FOV 公式估 focal length | 若資料集提供 FOV，可比 approximate K 更有依據 | 使用者常不知道 FOV，錯誤輸入會污染 pose | fallback |
-| Calibration video + `cv2.calibrateCamera` | 由棋盤格 / Charuco 取得 calibrated K | 可估 distortion，可輸出 reprojection error | 需要拍 calibration video，與目前主決策不一致 | 後續升級 |
-| Existing intrinsics JSON | 讀取外部已知相機內參 | 最穩定，可直接進正式 calibrated pose | 需要確定解析度、焦段、鏡頭設定一致 | 可選升級 |
-
-### A3. Frame Preprocessing 技術
-
-| 技術 / 工具 | 特性 | 優點 | 缺點 | 第一版建議 |
-|---|---|---|---|---|
-| `cv2.cvtColor` grayscale | BGR 轉單通道灰階 | LK 與 corner detection 標準輸入 | 失去顏色資訊 | 採用 |
-| `cv2.resize` | 固定處理解析度 | 提升速度，讓 debug 輸出穩定 | 需要同步更新 approximate K | 採用 |
-| Gaussian blur | 平滑雜訊 | 可減少細碎 noise 對 corner 的影響 | 過度 blur 會降低角點品質 | 視情況 |
-| CLAHE | 局部對比增強 | 低光或對比不足時可增加 feature | 可能放大 noise | 後續評估 |
-| Undistort | 使用 `K` 與 `dist_coeffs` 修正鏡頭變形 | calibrated pipeline 需要 | approximate K 無法可靠 undistort | 只在 calibrated K 時使用 |
-
-### A4. Feature / Optical Flow 技術
-
-| 技術 / 工具 | 特性 | 優點 | 缺點 | 第一版建議 |
-|---|---|---|---|---|
-| Shi-Tomasi + LK | sparse corner tracking | 快、可追蹤 ID、容易畫 path debug | 大位移、低紋理、模糊時容易失敗 | 採用 |
-| ORB matching | keypoint + binary descriptor | 可做重新初始化與大位移 matching | matching outliers 較多，需要額外 ratio / RANSAC 過濾 | fallback |
-| SIFT matching | keypoint + descriptor | 尺度與旋轉穩定性較好 | 較慢，對第一版 debug 成本偏高 | 後續評估 |
-| Farneback dense flow | 全畫面 dense optical flow | 可做 heatmap 與整體 motion visualization | 不容易直接管理 correspondences 給 pose | debug 輔助 |
-| DIS dense flow | 快速 dense flow | dense flow 速度較好 | 仍需額外抽樣 / 過濾才能接 pose | 後續評估 |
-| RAFT / learned flow | 深度學習 dense flow | flow 精度高 | 需要模型、GPU、依賴複雜 | 不作第一版 |
-
-### A5. Track Filtering 技術
-
-| 技術 / 工具 | 特性 | 優點 | 缺點 | 第一版建議 |
-|---|---|---|---|---|
-| LK status / error mask | 使用 LK 內建追蹤品質 | 實作簡單，直接移除明顯失敗 tracks | 無法處理所有幾何 outliers | 採用 |
-| Displacement threshold | 根據位移大小過濾 | 可移除過大跳動與幾乎不動的 tracks | threshold 需要依影片調整 | 採用 |
-| Border filtering | 移除離開畫面的 points | 避免 invalid coordinates | 無法判斷動態物體 | 採用 |
-| RANSAC inlier mask | 使用幾何一致性過濾 | 對誤追蹤與動態物體較有效 | 需要足夠 correspondences | 採用 |
-| Forward-backward check | 前向與反向 tracking 一致性檢查 | 可提升 track 品質 | 運算量增加 | 後續評估 |
-
-### A6. Geometry / Pose 技術
-
-| 技術 / 工具 | 特性 | 優點 | 缺點 | 第一版建議 |
-|---|---|---|---|---|
-| Essential Matrix + RANSAC | calibrated / approximate-K epipolar geometry | 可接 `recoverPose` 得 relative `R`, `t` | approximate K 會降低可信度，translation 無尺度 | 採用 |
-| Fundamental Matrix | uncalibrated epipolar geometry | 不需要 `K` | 不能直接取得 calibrated relative pose | 分析輔助 |
-| Homography | 平面或純旋轉模型 | 對平面場景、純旋轉可穩定 | 一般 3D translation 不完整 | model comparison |
-| PnP | 3D-2D pose estimation | 可估 absolute pose | 需要已知 3D points | 不適合第一版 |
-| Bundle Adjustment | 多幀最佳化 | 可提升長序列穩定性 | 實作複雜，需要初始值與更多資料 | 後續研究 |
-
-### A7. Angle / Motion Output 技術
-
-| 技術 / 工具 | 特性 | 優點 | 缺點 | 第一版建議 |
-|---|---|---|---|---|
-| Rotation matrix to Euler | 將 `R` 轉 yaw / pitch / roll | 易讀，適合 overlay | 有 rotation order 與 gimbal lock 問題 | 採用，固定 ZYX |
-| Quaternion | 適合累積旋轉與平滑 | 數值穩定，避免部分 Euler 問題 | 使用者較不直覺 | 後續內部表示 |
-| Rodrigues vector | OpenCV 常用旋轉表示 | 與 OpenCV API 相容 | 不如 Euler 易讀 | 可作內部輔助 |
-| Accumulated relative pose | 累積 frame-to-frame rotation | 可觀察長時間趨勢 | 誤差會漂移 | debug-only |
-
-### A8. Debug / Visualization 技術
-
-| 技術 / 工具 | 特性 | 優點 | 缺點 | 第一版建議 |
-|---|---|---|---|---|
-| OpenCV drawing APIs | 畫點、線、箭頭、文字 | 與 frame pipeline 直接整合 | 複雜圖表能力有限 | 採用 |
-| Matplotlib | 畫統計圖、histogram、曲線 | 適合 report 與參數比較 | 不適合逐幀 overlay | report 輔助 |
-| JSON / CSV log | 保存每幀資料 | 可追溯、可後續分析 | 需要定義 schema | 採用 |
-| Markdown report | 整理 debug 結論 | 易讀，適合 breakdown 文件 | 需要額外產生流程 | 後續評估 |
-
-### A9. Verification 技術
-
-| 技術 / 工具 | 特性 | 優點 | 缺點 | 第一版建議 |
-|---|---|---|---|---|
-| Inlier ratio | RANSAC inliers / valid tracks | 直接反映幾何一致性 | 高 inlier 不代表 pose 絕對正確 | 採用 |
-| Track count | 有效追蹤點數 | 可快速判斷 tracking 是否失敗 | 點數多仍可能被動態物體污染 | 採用 |
-| Pose jitter | 連續幀角度波動 | 可判斷穩定性 | 真實快速運動可能被誤判為 jitter | 採用 |
-| Warning distribution | 統計 warning 出現頻率 | 可看出失敗型態 | 需要清楚 warning taxonomy | 採用 |
-| OXTS trend comparison | 與 ground truth 趨勢比較 | 可作外部參考 | approximate K 不可宣稱 absolute pose 對齊 | 僅作 debug reference |
-
-## 6. 小階段工具使用整理
-
-在列出每個模組可使用的技術之後，再整理每個小階段的 what / why / how。這一段用來說明「要做什麼、為什麼要做、如何做」，後續的最終 Mermaid 流程會以這些小階段作為節點。
-
-| ID | 小階段 | What 使用工具 | Why 使用原因 | How 使用方式 | How-to 實作重點 |
-|---|---|---|---|---|---|
-| A1 | Video Input | OpenCV `cv2.VideoCapture` | OpenCV 可直接取得 frame、fps、width、height，適合逐幀分析 | 開啟 pose video 後逐幀讀取，保存 `frame_index` 與 `timestamp_sec` | 用 `CAP_PROP_FPS` 取得 fps，用 `frame_index / fps` 計算時間 |
-| A1 | Video Output | OpenCV `cv2.VideoWriter` | overlay debug 需要回放，影片輸出比單張圖更容易檢查 pose 變化 | 使用原始 fps 或設定 fps 寫出 annotated frames | 確認 codec、frame size、色彩格式與輸入一致 |
-| A2 | Approximate Intrinsics | NumPy matrix | 第一版沒有 calibration video 時仍需要 `K` 提供給 Essential Matrix / recoverPose | 依照處理後解析度建立 `f=max(width,height)`、`cx=width/2`、`cy=height/2` | 把 `source`、`confidence`、warnings 一起寫入 pose JSON |
-| A3 | Grayscale Conversion | OpenCV `cv2.cvtColor` | LK optical flow 與 corner detection 通常使用單通道灰階影像 | 將 BGR frame 轉為 grayscale frame | 保留原始 BGR frame 給 overlay，gray frame 給 tracking |
-| A3 | Resize | OpenCV `cv2.resize` | 降低運算量並讓 debug 速度穩定 | 將 frame resize 到固定寬度或固定比例 | resize 後 approximate K 必須用處理後解析度重建 |
-| A4 | Feature Detection | `cv2.goodFeaturesToTrack` | Shi-Tomasi corner 適合 LK sparse tracking，速度快且容易 debug | 在第一幀或 tracks 不足時重新偵測角點 | 設定 `maxCorners`、`qualityLevel`、`minDistance` |
-| A4 | Optical Flow Tracking | `cv2.calcOpticalFlowPyrLK` | Pyramidal LK 適合追蹤連續 frame 中的小到中等位移 | 用 previous gray、current gray 與 previous points 取得 current points | 保存 status、error、prev/current point pairs |
-| A5 | Track Filtering | NumPy boolean mask | LK 會產生失敗 tracks，必須先過濾再估幾何 | 根據 status、error、位移範圍、畫面邊界建立 mask | 過濾後點數低於門檻時重新偵測 features |
-| A6 | Robust Geometry | `cv2.findEssentialMat` + RANSAC | 動態物體、誤追蹤與低紋理會造成 outliers，RANSAC 可保留幾何一致點 | 將 filtered correspondences 與 `K` 傳入，取得 `E` 與 inlier mask | 記錄 inlier count、inlier ratio、RANSAC threshold |
-| A6 | Pose Recovery | `cv2.recoverPose` | Essential Matrix 可拆出 frame-to-frame relative rotation 與 translation direction | 使用 `E`、point correspondences、`K` 取得 `R`、`t` | `t` 只代表方向，不能當真實距離 |
-| A7 | Euler Conversion | NumPy `atan2`, `sqrt` | overlay 與 report 需要可讀的 yaw / pitch / roll | 固定 ZYX rotation order 將 `R` 轉成角度 | 輸出 degree、rotation order、relative / accumulated 標記 |
-| A8 | Debug Overlay | OpenCV drawing APIs | 使用者需要看到 flow、inliers、pose warning 才能判斷結果是否可信 | 在 BGR frame 上畫 points、arrows、文字與狀態 | overlay 不應遮住關鍵畫面，warning 必須可見 |
-| A9 | Verification Report | JSON / CSV / Matplotlib | debug pose 需要用數據判斷穩定性，不只看影片感覺 | 將每幀 metrics 存成 JSON / CSV，再產生 summary plots | 指標包含 valid tracks、inlier ratio、pose jitter、warnings |
-
-## 7. 最終步驟與資料傳遞流程
-
-此流程圖以第 6 節「小階段工具使用整理」為節點來源，重點放在每個小階段傳遞給下一個小階段的資料格式。
-
-```mermaid
-flowchart TD
-    A[Pose Video File] -->|video_path: .mp4| B[A1 Frame Reader]
-    B -->|frame_packet: ndarray + frame_index + timestamp_sec + fps + size| C[A2 Intrinsics Provider]
-    B -->|bgr_frame: ndarray| D[A3 Frame Preprocessor]
-    C -->|intrinsics_meta: json<br/>K: 3x3 ndarray<br/>warnings: list| I[A6 Essential Matrix + RANSAC]
-    C -->|intrinsics_meta: json<br/>K: 3x3 ndarray| N[A8 Overlay Renderer]
-    D -->|gray_frame: ndarray<br/>scale_meta: json| E[A4 Feature Detector]
-    E -->|points_prev: Nx1x2 ndarray| F[A4 LK Optical Flow Tracker]
-    D -->|prev_gray + curr_gray: ndarray| F
-    F -->|track_result: json<br/>points_prev: Nx2<br/>points_curr: Nx2<br/>status: Nx1<br/>error: Nx1| G[A5 Track Filter]
-    G -->|filtered_correspondences: json<br/>points1: Mx2 ndarray<br/>points2: Mx2 ndarray| H{Enough Valid Tracks}
-    H -->|no: track_count below threshold| E
-    H -->|yes: points1 + points2 ndarray| I
-    I -->|geometry_result: json<br/>E: 3x3 ndarray<br/>inlier_mask: Mx1<br/>inlier_ratio: float| J{Enough Inliers}
-    J -->|no: unreliable_pose_record json| K[A7 Pose Status Formatter]
-    J -->|yes: E + inlier correspondences + K| L[A6 recoverPose]
-    L -->|pose_raw: json<br/>R: 3x3 ndarray<br/>t: 3x1 ndarray<br/>pose_inliers: int| M[A7 Euler Converter]
-    M -->|pose_record: json<br/>yaw_pitch_roll: degree<br/>pose_type: relative| N
-    K -->|pose_record: json<br/>status: unreliable<br/>warnings: list| N
-    B -->|bgr_frame: ndarray| N
-    G -->|tracks_for_overlay: json<br/>inliers/outliers mask| N
-    N -->|annotated_frame: ndarray| O[A1 Video Writer]
-    N -->|frame_pose_results.json<br/>overlay_metadata.json| P[A9 Verification Metrics]
-    O -->|pose_overlay_uncalibrated.mp4| Q[Output Artifacts]
-    P -->|metrics_summary.json<br/>pose_timeline.csv<br/>plots: png| R[Debug Report]
-    R -->|report.md| Q
+```text
+outputs/optical_flow_pose/pose_overlay_uncalibrated/
+├── output_pose_overlay.mp4
+├── frame_pose_results.json
+├── pose_timeline.csv
+├── debug_frames/
+└── evaluation/
 ```
 
-## 8. Analysis 到 Design 的對應原則
+---
 
-Design 文件必須遵守下列對應規則：
+## 8. 重要限制與風險
 
-- Analysis 的 A1 到 A9 必須在 Design 中有 D1 到 D9 對應模組。
-- Design 可以拆出更多 implementation files，但不能讓核心責任消失。
-- 若 Design 新增模組，必須標明它支援哪一個 Analysis ID。
-- 若未來從 approximate K 升級為 calibrated K，只能替換 D2，不應重寫整條 pipeline。
+| 限制或風險 | 可能造成的結果 | 應對方式 |
+|---|---|---|
+| Approximate `K` 不準 | yaw、pitch、roll 出現系統性誤差 | 明確標示 debug-only；未來以 calibrated `K` 替換 A2 |
+| 單眼影片沒有尺度 | `t` 無法代表真實公尺或速度 | 只輸出方向，不輸出 metric translation |
+| 動態物體太多 | RANSAC 可能選到錯誤運動模型 | 監控 inlier 分布；增加 motion mask 或語意過濾 |
+| 低紋理、低光或 motion blur | 特徵點少、LK 容易追丟 | 調整特徵參數；視場景加入 CLAHE 或其他 tracker |
+| 點集中在小區域 | Inlier ratio 看似很高，但幾何仍不穩 | 增加空間分布指標或網格化選點 |
+| 純旋轉或近似平面場景 | Essential Matrix 可能退化 | 同時比較 Homography，輸出 model warning |
+| Euler angles 定義不同 | 相同 `R` 可能得到不同角度說法 | 固定 ZYX、座標系與正負方向，輸出到 metadata |
+| 累積相對旋轉 | 誤差隨時間漂移 | 同時保留 frame-to-frame 值；累積值只作趨勢參考 |
+
+## 9. Analysis 到 Design 的交接原則
+
+- A1 到 A9 都必須在 Design 中找到對應責任，不能在實作時悄悄消失。
+- Design 可以把一個 Analysis 模組拆成多個 class 或 service，但要標明它們服務哪個 Analysis ID。
+- 候選技術不等於已實作技術；Design 必須記錄最後選擇與放棄原因。
+- 從 approximate `K` 升級為 calibrated `K` 時，應優先替換 A2，不重寫整條 pipeline。
+- 每個 pose record 都必須能追溯到輸入影格、設定、內參來源、演算法狀態與 warnings。
+
+## 10. 延伸分析文件
+
+| 文件 | 補充內容 |
+|---|---|
+| `optical_flow_motion_path_analysis.md` | Sparse flow、track path、flow speed 與路徑視覺化 |
+| `fov_intrinsics_analysis.md` | Approximate `K`、FOV-derived `K` 與 calibrated `K` 的差異 |
+| `coordinate_transform_matrix_analysis.md` | Pixel、normalized camera coordinate 與相機座標轉換 |
+| `../03_Design/optical_flow_pose_pipeline_design.md` | 第一版模組、介面與資料流設計 |
+| `../04_Implementation/stage_11_13_optical_flow_pose_pipeline.md` | 實作階段、工具入口與完成條件 |
