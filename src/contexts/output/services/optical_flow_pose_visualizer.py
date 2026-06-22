@@ -15,15 +15,6 @@ def draw_uncalibrated_pose_overlay(
     pose: RelativePoseEstimate | None,
 ) -> np.ndarray:
     output = frame_bgr.copy()
-    inlier_mask = pose.inlier_mask if pose is not None else []
-    for index, vector in enumerate(vectors):
-        is_inlier = index < len(inlier_mask) and inlier_mask[index]
-        color = (0, 220, 0) if is_inlier else (0, 0, 255)
-        start = (int(round(vector.x0)), int(round(vector.y0)))
-        end = (int(round(vector.x1)), int(round(vector.y1)))
-        cv2.arrowedLine(output, start, end, color, 1, cv2.LINE_AA, tipLength=0.22)
-        cv2.circle(output, end, 2, color, -1, cv2.LINE_AA)
-
     _draw_text_panel(output, pose)
     return output
 
@@ -70,4 +61,3 @@ def _draw_text_panel(image: np.ndarray, pose: RelativePoseEstimate | None) -> No
 
 def _fmt(value: float | None) -> str:
     return "N/A" if value is None else f"{value:.3f}"
-
