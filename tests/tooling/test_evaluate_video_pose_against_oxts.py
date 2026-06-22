@@ -75,7 +75,9 @@ def test_loads_oxts_txt_and_converts_radians_to_degrees(tmp_path: Path) -> None:
     oxts_dir = tmp_path / "oxts"
     oxts_dir.mkdir()
     values = [0.0, 0.0, 0.0, math.radians(1.0), math.radians(2.0), math.radians(3.0)]
-    (oxts_dir / "0000000000.txt").write_text(" ".join(str(value) for value in values), encoding="utf-8")
+    (oxts_dir / "0000000000.txt").write_text(
+        " ".join(str(value) for value in values), encoding="utf-8"
+    )
 
     poses = load_poses(oxts_dir)
 
@@ -103,6 +105,9 @@ def test_evaluates_error_and_handles_missing_angles(tmp_path: Path) -> None:
     assert evaluated[1]["yaw_error"] is None
     assert evaluated[1]["abs_yaw_error"] is None
     assert evaluated[1]["roll_error"] == 1.0
+    assert evaluated[0]["geodesic_error_deg"] is not None
+    assert evaluated[0]["pose_valid"] is True
+    assert evaluated[1]["pose_valid"] is False
 
 
 def test_summary_statistics_and_worst_frames_are_sorted(tmp_path: Path) -> None:
@@ -164,7 +169,7 @@ def test_summary_statistics_and_worst_frames_are_sorted(tmp_path: Path) -> None:
     assert worst[0]["frame_index"] == 1
 
 
-def test_writes_outputs_and_matplotlib_plots(tmp_path: Path) -> None:
+def test_writes_optional_outputs_and_matplotlib_plots(tmp_path: Path) -> None:
     evaluated = evaluate_rows(
         [
             {
@@ -189,10 +194,17 @@ def test_writes_outputs_and_matplotlib_plots(tmp_path: Path) -> None:
         [PoseAngles(yaw_deg=7.0, pitch_deg=1.0, roll_deg=0.5)],
     )
 
-    outputs = write_evaluation_outputs(evaluated, tmp_path / "new" / "evaluation")
+    outputs = write_evaluation_outputs(
+        evaluated,
+        tmp_path / "new" / "evaluation",
+        save_plots=True,
+        save_worst_frames=True,
+    )
 
     assert outputs.comparison_csv.exists()
     assert outputs.summary_json.exists()
+    assert outputs.report_md.exists()
+    assert outputs.worst_frames_csv is not None
     assert outputs.worst_frames_csv.exists()
     assert (tmp_path / "new" / "evaluation").exists()
     for path in outputs.plot_paths.values():
@@ -210,7 +222,56 @@ def test_run_evaluation_writes_expected_files(tmp_path: Path) -> None:
 
     outputs = run_evaluation(pose_csv, oxts_dir, tmp_path / "evaluation")
 
-    comparison_rows = list(csv.DictReader(outputs.comparison_csv.open(encoding="utf-8")))
+    comparison_rows = list(
+        csv.DictReader(outputs.comparison_csv.open(encoding="utf-8"))
+    )
     summary = json.loads(outputs.summary_json.read_text(encoding="utf-8"))
     assert len(comparison_rows) == 2
     assert summary["total_rows"] == 2
+    assert summary["selected_metrics"]["theta_deg"] == 3.0
+    assert summary["selected_metrics"]["valid_prediction_count"] == 1
+    assert summary["diagnostic_only"] is True
+    assert outputs.report_md.exists()
+    assert outputs.worst_frames_csv is None
+    assert outputs.plot_paths == {}
+    assert sorted(path.name for path in (tmp_path / "evaluation").iterdir()) == [
+        "evaluation_report.md",
+        "pose_vs_oxts.csv",
+        "pose_vs_oxts_summary.json",
+    ]
+
+
+def test_uses_calibrated_heading_when_comparison_is_ready() -> None:
+    evaluated = evaluate_rows(
+        [
+            {
+                "frame_index": 0,
+                "time_sec": 0.0,
+                "yaw": 40.0,
+                "calibrated_heading_yaw": 10.0,
+                "comparison_ready": True,
+                "pose_semantics": "calibrated_absolute_heading",
+                "pitch": 2.0,
+                "roll": 1.0,
+                "confidence": 0.9,
+                "yaw_confidence": 0.9,
+                "pitch_confidence": 0.9,
+                "roll_confidence": 0.9,
+                "status": "full",
+                "detected_line_count": 20,
+                "near_horizontal_count": 10,
+                "near_vertical_count": 2,
+                "perspective_line_count": 8,
+                "vanishing_point_candidate_count": 4,
+                "horizon_candidate_count": 3,
+            }
+        ],
+        [PoseAngles(yaw_deg=10.0, pitch_deg=2.0, roll_deg=1.0)],
+    )
+
+    summary = build_summary(evaluated)
+
+    assert evaluated[0]["pred_yaw"] == 10.0
+    assert evaluated[0]["yaw_source"] == "calibrated_heading_yaw"
+    assert summary["strict_pose_comparison_ready"] is True
+    assert summary["selected_metrics"]["precision_at_theta"] == 1.0
