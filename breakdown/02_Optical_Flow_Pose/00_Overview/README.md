@@ -1,5 +1,15 @@
 # Optical Camera-Pose Estimation Overview
 
+## Pose Evaluation Metrics
+
+本專案使用 `Precision@θ`、`Recall@θ`、`Geodesic MAE`、`P95 Error` 與 `Jitter` 評估 frame-to-frame relative pose。Optical-flow pose 使用 approximate `K`，因此只與 OXTS frame-to-frame rotation delta 比較，不與 OXTS absolute pose 直接比較。預設門檻為 `θ = 1.0°`，可由評估 CLI 調整。
+
+- `Precision@θ`：有效姿態中，Geodesic Error 不超過 `θ` 的比例。
+- `Recall@θ`：全部參考幀中，成功輸出且誤差不超過 `θ` 的比例。
+- `Geodesic MAE`：SO(3) 最短旋轉角誤差的平均值。
+- `P95 Error`：95% 有效預測不超過的 Geodesic Error。
+- `Jitter`：相鄰幀 rotation-error 變化量的 RMS。
+
 ## 1. 專案目標
 
 本專案目標是從影片中的 2D optical flow 變化估計攝影機的 3D 姿態變化，並將 yaw、pitch、roll、tracked feature points、optical flow vectors、inlier count、confidence 等資訊疊加回輸出影片。

@@ -1,5 +1,19 @@
 # Geometry Based Pose Requirements
 
+## Evaluation Requirements
+
+| ID | Requirement | Acceptance definition |
+|---|---|---|
+| ER-01 | 計算 `Precision@θ` | `correct_valid_predictions / valid_predictions` |
+| ER-02 | 計算 `Recall@θ` | `correct_valid_predictions / reference_samples`；無姿態輸出仍納入分母 |
+| ER-03 | 計算 `Geodesic MAE` | 有效姿態 SO(3) Geodesic Error 平均值，單位 degree |
+| ER-04 | 計算 `P95 Error` | 有效姿態 Geodesic Error 第 95 百分位 |
+| ER-05 | 影片模式計算 `Jitter` | 連續幀 rotation-error Geodesic 變化量 RMS；單張影像回傳 N/A |
+| ER-06 | 允許設定 `θ` | Geometry 預設 `3.0°`，使用 `--theta-deg` 覆寫 |
+| ER-07 | 驗證姿態語意 | 只有 calibrated heading 且 `comparison_ready=true` 才能進行正式 OXTS absolute pose 解讀 |
+| ER-08 | 標記非嚴格比較 | raw geometry yaw 評估必須輸出 `diagnostic_only=true` 與 comparison warning |
+| ER-09 | 預設精簡輸出 | 僅輸出 comparison CSV、summary JSON 與 evaluation report |
+
 ## 1. 目的
 
 本文件定義 Geometry Based Pose 第一版需要完成的需求。需求階段只描述系統要做到什麼，不規定完整程式架構與 OpenCV 參數。
@@ -113,4 +127,3 @@ flowchart TD
 ```text
 01_Requirements/requirements_breakdown.md
 ```
-

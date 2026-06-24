@@ -1,7 +1,7 @@
 [project]
-name = "photo-metadata-geometry-analyzer"
+name = "visual-pose-angle-detector"
 version = "0.1.0"
-description = "Python CLI for reading photo EXIF metadata and preparing geometry analysis."
+description = "Python CLI and OpenCV toolkit for geometry-based and optical-flow camera pose analysis."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

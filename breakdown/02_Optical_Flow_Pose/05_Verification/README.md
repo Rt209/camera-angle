@@ -1,5 +1,39 @@
 # Optical Flow Pose Verification
 
+## Selected Metric Verification
+
+### Test Dataset
+
+- Pose source：`frame_pose_results.json` 的 frame-to-frame relative pose。
+- Reference：同 frame index 的 KITTI OXTS 相鄰幀 rotation delta。
+- 有效幀：yaw、pitch、roll 三軸都有數值。
+- Dropout：不進入 Precision 分母，但保留於 Recall 分母。
+- 資料切分必須以完整 video sequence 為單位，避免相鄰幀 leakage。
+
+### Metric Definitions
+
+| Metric | Definition | Unit |
+|---|---|---|
+| `Precision@θ` | `correct_valid / valid_prediction_count` | ratio |
+| `Recall@θ` | `correct_valid / reference_count` | ratio |
+| `Geodesic MAE` | `mean(geodesic_error_deg)` | degree |
+| `P95 Error` | `percentile(geodesic_error_deg, 95)` | degree |
+| `Jitter` | RMS of consecutive rotation-error changes | degree |
+
+correct 表示 `geodesic_error_deg <= θ`；Optical Flow 預設 `θ = 1.0°`。
+
+### Evaluation Results
+
+每次驗證從 `summary.json.selected_metrics` 記錄 `theta_deg`、Precision、Recall、Geodesic MAE、P95 Error、Jitter、有效預測數與 reference 數，不在文件中硬編碼單次執行結果。
+
+### Failure Case Analysis
+
+- Precision 過低：檢查高 Geodesic Error、dynamic-object tracks、RANSAC 退化與 approximate `K`。
+- Recall 過低：區分 pose dropout 與超過 `θ` 的有效輸出，並檢查 track／inlier count。
+- Geodesic MAE 過高：檢查 bias、Euler convention 與 intrinsics sensitivity。
+- P95 過高：使用 `--save-worst-frames --save-plots` 分析尾端 outliers。
+- Jitter 過高：檢查 track replacement、inlier set 突變及 rotation solution ambiguity。
+
 ## 1. 目的
 
 本文件定義 optical flow camera-pose pipeline 的驗證方式、測試案例、指標、誤差評估與結果判讀。
@@ -46,6 +80,10 @@
 ```text
 intrinsics_unreliable
 ```
+
+## 2026-06 KITTI regression
+
+驗收資料共 154 frames／153 relative pairs。正常模式沒有建立 debug PNG；opt-in 測試以 every-15、maximum-3 精確產生 3 張。Evaluation 的 Recall 分母固定為全部 153 個 reference pairs，rejected frame 不會從分母消失。報告分列 raw 與 accepted metrics，並以 geodesic error > 30° 統計 catastrophic outlier。
 
 ## 4. Tracking Verification
 
@@ -113,6 +151,8 @@ RMSE = sqrt(mean(error^2))
 注意：
 
 - KITTI OXTS 是世界座標 / 車體座標資料，必須先確認座標系。
+- `2011_09_26_drive_0005_sync` sample 來自 rectified color `image_03`；內參使用 `P_rect_03`，不可誤用 `P_rect_02`。
+- OXTS body orientation 轉成 `recoverPose` camera motion 時使用 `R_current.T @ R_previous`，再套用 camera/vehicle rotation conjugation。
 - 本 pipeline 第一版多半輸出 relative pose，需要和 ground truth relative delta 比較。
 - Euler angle rotation order 必須一致。
 

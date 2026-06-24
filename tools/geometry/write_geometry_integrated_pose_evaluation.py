@@ -84,7 +84,7 @@ def main() -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Write integrated pitch/yaw/roll geometry pose evaluation.")
-    parser.add_argument("--video-pose-csv", type=Path, default=Path("outputs/video_pose/evaluation/pose_vs_oxts.csv"))
+    parser.add_argument("--video-pose-csv", type=Path, default=Path("outputs/video_pose/evaluation/per_frame.csv"))
     parser.add_argument(
         "--calibrated-yaw-csv",
         type=Path,

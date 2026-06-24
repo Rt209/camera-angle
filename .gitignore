@@ -35,6 +35,10 @@ outputs/optical_flow_pose/sparse_flow/
 outputs/optical_flow_pose/pose_overlay_uncalibrated/debug_frames/
 debug/
 
+# User-provided datasets can be large and should stay local.
+data/datasets/**
+!data/datasets/README.md
+
 # IDE and editor files
 .idea/
 .vscode/

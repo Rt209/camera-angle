@@ -1,5 +1,21 @@
 # Optical Flow Pose Analysis
 
+## Evaluation Metric Analysis
+
+`Precision@θ` 與 `Recall@θ` 以角度門檻定義連續姿態的正確預測。Precision 回答有效輸出有多少可信；Recall 把 pose dropout 納入，避免只輸出少數容易幀而得到虛高分數。Optical Flow 預設 `θ = 1.0°`。
+
+`Geodesic MAE` 使用整體旋轉而非只看三個 Euler 軸：
+
+```text
+R_error = R_pred * transpose(R_gt)
+e_geo = acos(clamp((trace(R_error) - 1) / 2, -1, 1))
+Geodesic MAE = mean(e_geo)
+```
+
+`P95 Error` 呈現尾端風險，可發現 MAE 掩蓋的 Essential Matrix 退化、錯誤 tracks 或 `recoverPose` outliers。
+
+影片本身含真實運動，因此 `Jitter` 不直接對 predicted pose 求標準差。本專案先形成每幀 rotation error，再計算連續 error rotations 的 Geodesic change，最後取 RMS，以衡量扣除 OXTS 真實運動後的時間不穩定性。
+
 ## 1. 文件目的
 
 這份文件回答四個問題：
@@ -311,7 +327,7 @@ flowchart TD
 
 ```text
 outputs/optical_flow_pose/pose_overlay_uncalibrated/
-├── output_pose_overlay.mp4
+├── pose_overlay.mp4
 ├── frame_pose_results.json
 ├── pose_timeline.csv
 ├── debug_frames/

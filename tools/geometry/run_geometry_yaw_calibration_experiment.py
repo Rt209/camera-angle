@@ -20,12 +20,14 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 
-CALIBRATION_RANGE = range(0, 81)
-VALIDATION_RANGE = range(81, 154)
+CALIBRATION_RANGE = range(0, 80)
+VALIDATION_RANGE = range(80, 110)
+TEST_RANGE = range(110, 154)
 SEGMENTS = {
     "all": range(0, 154),
-    "calibration_0_80": CALIBRATION_RANGE,
-    "validation_81_153": VALIDATION_RANGE,
+    "train_0_79": CALIBRATION_RANGE,
+    "validation_80_109": VALIDATION_RANGE,
+    "held_out_test_110_153": TEST_RANGE,
     "frame_91_100": range(91, 101),
     "frame_112_117": range(112, 118),
     "frame_150_153": range(150, 154),
@@ -51,6 +53,7 @@ OUTPUT_COLUMNS = [
     "yaw_calibration_scale",
     "yaw_calibration_offset",
     "comparison_ready",
+    "experimental_oxts_fit",
     "vp_temporal_jump",
     "vp_side_flip",
     "vp_cluster_ambiguity",
@@ -88,7 +91,7 @@ def main() -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run geometry yaw calibration transform experiment.")
     parser.add_argument("--pose-csv", type=Path, default=Path("outputs/video_pose/pose_timeline.csv"))
-    parser.add_argument("--comparison-csv", type=Path, default=Path("outputs/video_pose/evaluation/pose_vs_oxts.csv"))
+    parser.add_argument("--comparison-csv", type=Path, default=Path("outputs/video_pose/evaluation/per_frame.csv"))
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/geometry_yaw_oxts_experiment"))
     return parser
 
@@ -134,8 +137,8 @@ def fit_offset_model(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "model_type": "offset_only",
         "scale": 1.0,
         "yaw_offset": offset,
-        "calibration_segment": "frame_0_80",
-        "validation_segment": "frame_81_153",
+        "calibration_segment": "frame_0_79",
+        "validation_segment": "frame_80_109",
     }
 
 
@@ -151,8 +154,8 @@ def fit_linear_model(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "model_type": "linear",
         "scale": float(scale),
         "yaw_offset": float(offset),
-        "calibration_segment": "frame_0_80",
-        "validation_segment": "frame_81_153",
+        "calibration_segment": "frame_0_79",
+        "validation_segment": "frame_80_109",
     }
 
 
@@ -183,7 +186,7 @@ def build_output_rows(rows: list[dict[str, Any]], model: dict[str, Any]) -> list
         raw_error = _abs_error(row["image_geometry_yaw"], row["oxts_yaw"])
         current_error = row["current_abs_yaw_error"]
         calibrated_error = _abs_error(calibrated, row["oxts_yaw"])
-        confidence_after = adjusted_confidence(row, calibrated_error)
+        confidence_after = adjusted_confidence(row)
         output.append(
             {
                 "frame_index": row["frame_index"],
@@ -204,7 +207,8 @@ def build_output_rows(rows: list[dict[str, Any]], model: dict[str, Any]) -> list
                 "yaw_calibration_model": model["model_type"],
                 "yaw_calibration_scale": model["scale"],
                 "yaw_calibration_offset": model["yaw_offset"],
-                "comparison_ready": True,
+                "comparison_ready": False,
+                "experimental_oxts_fit": True,
                 "vp_temporal_jump": row["vp_temporal_jump"],
                 "vp_side_flip": row["vp_side_flip"],
                 "vp_cluster_ambiguity": row["vp_cluster_ambiguity"],
@@ -215,7 +219,7 @@ def build_output_rows(rows: list[dict[str, Any]], model: dict[str, Any]) -> list
     return output
 
 
-def adjusted_confidence(row: dict[str, Any], calibrated_error: float | None) -> float | None:
+def adjusted_confidence(row: dict[str, Any]) -> float | None:
     confidence = row["yaw_confidence"]
     if confidence is None:
         return None
@@ -229,8 +233,6 @@ def adjusted_confidence(row: dict[str, Any], calibrated_error: float | None) -> 
         penalty += 0.10
     if row["line_support_consistency"] is not None and row["line_support_consistency"] < 0.35:
         penalty += 0.10
-    if calibrated_error is not None and calibrated_error >= 30.0:
-        penalty += 0.25
     return round(max(0.0, min(1.0, confidence * (1.0 - min(penalty, 0.75)))), 2)
 
 
@@ -266,8 +268,8 @@ def build_summary(
         }
     summary["success_criteria"] = {
         "validation_mae_improved": (
-            summary["segments"]["validation_81_153"]["calibrated_yaw_mae"]
-            < summary["segments"]["validation_81_153"]["current_yaw_mae"]
+            summary["segments"]["validation_80_109"]["calibrated_yaw_mae"]
+            < summary["segments"]["validation_80_109"]["current_yaw_mae"]
         ),
         "confidence_failure_reduced": (
             summary["confidence_failure_after"] < summary["confidence_failure_before"]
@@ -291,8 +293,9 @@ def model_metrics(rows: list[dict[str, Any]], model: dict[str, Any]) -> dict[str
         "model_type": model["model_type"],
         "scale": model["scale"],
         "yaw_offset": model["yaw_offset"],
-        "calibration_mae": _mae(_segment_rows(rows, CALIBRATION_RANGE), lambda row: apply_model(row, model)),
+        "train_mae": _mae(_segment_rows(rows, CALIBRATION_RANGE), lambda row: apply_model(row, model)),
         "validation_mae": _mae(_segment_rows(rows, VALIDATION_RANGE), lambda row: apply_model(row, model)),
+        "held_out_test_mae": _mae(_segment_rows(rows, TEST_RANGE), lambda row: apply_model(row, model)),
         "all_mae": _mae(rows, lambda row: apply_model(row, model)),
     }
 
@@ -311,8 +314,8 @@ def write_before_after(path: Path, summary: dict[str, Any]) -> None:
 | Metric | Before | After |
 |---|---:|---:|
 | All yaw MAE | {_fmt(segments['all']['current_yaw_mae'])} deg | {_fmt(segments['all']['calibrated_yaw_mae'])} deg |
-| Calibration segment yaw MAE | {_fmt(segments['calibration_0_80']['current_yaw_mae'])} deg | {_fmt(segments['calibration_0_80']['calibrated_yaw_mae'])} deg |
-| Validation segment yaw MAE | {_fmt(segments['validation_81_153']['current_yaw_mae'])} deg | {_fmt(segments['validation_81_153']['calibrated_yaw_mae'])} deg |
+| Train segment yaw MAE | {_fmt(segments['train_0_79']['current_yaw_mae'])} deg | {_fmt(segments['train_0_79']['calibrated_yaw_mae'])} deg |
+| Validation segment yaw MAE | {_fmt(segments['validation_80_109']['current_yaw_mae'])} deg | {_fmt(segments['validation_80_109']['calibrated_yaw_mae'])} deg |
 | Frame 91-100 yaw MAE | {_fmt(segments['frame_91_100']['current_yaw_mae'])} deg | {_fmt(segments['frame_91_100']['calibrated_yaw_mae'])} deg |
 | Frame 112-117 yaw MAE | {_fmt(segments['frame_112_117']['current_yaw_mae'])} deg | {_fmt(segments['frame_112_117']['calibrated_yaw_mae'])} deg |
 | Frame 150-153 yaw MAE | {_fmt(segments['frame_150_153']['current_yaw_mae'])} deg | {_fmt(segments['frame_150_153']['calibrated_yaw_mae'])} deg |
@@ -323,8 +326,8 @@ Selected model: `{summary['selected_model']['model_type']}`
 ```text
 scale = {summary['selected_model']['scale']}
 yaw_offset = {summary['selected_model']['yaw_offset']}
-calibration segment = frame 0-80
-validation segment = frame 81-153
+train segment = frame 0-79
+validation segment = frame 80-109
 ```
 """
     path.write_text(text, encoding="utf-8")
@@ -346,23 +349,25 @@ def write_report(path: Path, summary: dict[str, Any]) -> None:
 | model type | {summary['selected_model']['model_type']} |
 | scale | {summary['selected_model']['scale']:.6f} |
 | yaw offset | {summary['selected_model']['yaw_offset']:.6f} deg |
-| calibration segment | frame 0-80 |
-| validation segment | frame 81-153 |
+| train segment | frame 0-79 |
+| validation segment | frame 80-109 |
+| held-out test segment | frame 110-153 |
 
 候選模型比較：
 
-| Model | Calibration MAE | Validation MAE | All MAE |
-|---|---:|---:|---:|
-| offset-only | {_fmt(summary['offset_only_metrics']['calibration_mae'])} | {_fmt(summary['offset_only_metrics']['validation_mae'])} | {_fmt(summary['offset_only_metrics']['all_mae'])} |
-| linear | {_fmt(summary['linear_metrics']['calibration_mae'])} | {_fmt(summary['linear_metrics']['validation_mae'])} | {_fmt(summary['linear_metrics']['all_mae'])} |
+| Model | Train MAE | Validation MAE | Held-out Test MAE | All MAE |
+|---|---:|---:|---:|---:|
+| offset-only | {_fmt(summary['offset_only_metrics']['train_mae'])} | {_fmt(summary['offset_only_metrics']['validation_mae'])} | {_fmt(summary['offset_only_metrics']['held_out_test_mae'])} | {_fmt(summary['offset_only_metrics']['all_mae'])} |
+| linear | {_fmt(summary['linear_metrics']['train_mae'])} | {_fmt(summary['linear_metrics']['validation_mae'])} | {_fmt(summary['linear_metrics']['held_out_test_mae'])} | {_fmt(summary['linear_metrics']['all_mae'])} |
 
 ## Before / After
 
 | Segment | Before | After |
 |---|---:|---:|
 | All frames | {_fmt(segments['all']['current_yaw_mae'])} deg | {_fmt(segments['all']['calibrated_yaw_mae'])} deg |
-| Calibration 0-80 | {_fmt(segments['calibration_0_80']['current_yaw_mae'])} deg | {_fmt(segments['calibration_0_80']['calibrated_yaw_mae'])} deg |
-| Validation 81-153 | {_fmt(segments['validation_81_153']['current_yaw_mae'])} deg | {_fmt(segments['validation_81_153']['calibrated_yaw_mae'])} deg |
+| Train 0-79 | {_fmt(segments['train_0_79']['current_yaw_mae'])} deg | {_fmt(segments['train_0_79']['calibrated_yaw_mae'])} deg |
+| Validation 80-109 | {_fmt(segments['validation_80_109']['current_yaw_mae'])} deg | {_fmt(segments['validation_80_109']['calibrated_yaw_mae'])} deg |
+| Held-out Test 110-153 | {_fmt(segments['held_out_test_110_153']['current_yaw_mae'])} deg | {_fmt(segments['held_out_test_110_153']['calibrated_yaw_mae'])} deg |
 | Frame 91-100 | {_fmt(segments['frame_91_100']['current_yaw_mae'])} deg | {_fmt(segments['frame_91_100']['calibrated_yaw_mae'])} deg |
 | Frame 112-117 | {_fmt(segments['frame_112_117']['current_yaw_mae'])} deg | {_fmt(segments['frame_112_117']['calibrated_yaw_mae'])} deg |
 | Frame 150-153 | {_fmt(segments['frame_150_153']['current_yaw_mae'])} deg | {_fmt(segments['frame_150_153']['calibrated_yaw_mae'])} deg |
@@ -394,7 +399,7 @@ status = {summary['calibration_transform_status']}
 
 ## 解讀
 
-此實驗沒有針對特定 frame 寫 rule，而是只使用 frame 0-80 學習 transform 參數，再在 frame 81-153 驗證。若 validation MAE 下降，代表 image-geometry yaw 與 OXTS heading 至少存在可用的一階線性校準關係。
+此實驗沒有針對特定 frame 寫 rule，而是只使用 frame 0-79 學習 transform 參數，以 frame 80-109 選模，最後才在 held-out frame 110-153 報告結果。若 validation MAE 下降，代表 image-geometry yaw 與 OXTS heading 至少存在可用的一階線性校準關係；held-out test 不參與擬合或選模。
 
 需要注意：這仍是資料驅動的 yaw calibration，不等同於完整 camera-to-vehicle extrinsic calibration。若要進一步治本，下一步應建立明確的 camera intrinsics / extrinsics 與世界座標轉換。
 """
@@ -447,9 +452,11 @@ def write_plots(rows: list[dict[str, Any]], output_dir: Path) -> None:
 
 def segment_name(frame_index: int) -> str:
     if frame_index in CALIBRATION_RANGE:
-        return "calibration_0_80"
+        return "train_0_79"
     if frame_index in VALIDATION_RANGE:
-        return "validation_81_153"
+        return "validation_80_109"
+    if frame_index in TEST_RANGE:
+        return "held_out_test_110_153"
     return "outside_split"
 
 

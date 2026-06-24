@@ -1,5 +1,40 @@
 # Geometry Based Pose Verification
 
+## Selected Metric Verification
+
+### Test Dataset
+
+- 單張影像：使用具備同座標定義的姿態標註；Jitter 為 N/A。
+- Geometry video：逐幀結果與對齊後的 reference pose 比較。
+- 有效樣本：yaw、pitch、roll 三軸都有數值。
+- Dropout：不進入 Precision 分母，但保留於 Recall 分母。
+- 資料切分以完整 sequence／scene 為單位，避免相鄰幀 leakage。
+- OXTS absolute yaw 只有在 calibrated heading 與 `comparison_ready=true` 時才能作正式整體姿態驗證。
+
+### Metric Definitions
+
+| Metric | Definition | Unit |
+|---|---|---|
+| `Precision@θ` | `correct_valid / valid_prediction_count` | ratio |
+| `Recall@θ` | `correct_valid / reference_count` | ratio |
+| `Geodesic MAE` | `mean(geodesic_error_deg)` | degree |
+| `P95 Error` | `percentile(geodesic_error_deg, 95)` | degree |
+| `Jitter` | RMS of consecutive rotation-error changes；single image 為 N/A | degree |
+
+correct 表示 `geodesic_error_deg <= θ`；Geometry 預設 `θ = 3.0°`。
+
+### Evaluation Results
+
+每次驗證從 `summary.json.selected_metrics` 記錄 Precision、Recall、Geodesic MAE、P95 Error、Jitter、有效預測數與 reference 數。同時必須記錄 `strict_pose_comparison_ready`、`diagnostic_only` 與 `comparison_warning`。
+
+### Failure Case Analysis
+
+- Precision 過低：檢查有效輸出中的 VP selection、horizon、sign convention 與 line support。
+- Recall 過低：檢查 pose dropout、特徵不足與 confidence gate。
+- Geodesic MAE 過高：先確認座標語意，再檢查 calibration、角度 wrapping 與系統性 bias。
+- P95 過高：使用 `--save-worst-frames --save-plots` 分析 VP side flip 與極端場景。
+- Jitter 過高：檢查相鄰幀 VP cluster 切換、horizon jump 與 smoothing lag。
+
 ## 1. 目的
 
 本文件整理 Geometry Based Pose 的驗證入口。Verification 階段需要確認系統不只可以執行，也能在適合的幾何場景中輸出合理、可解釋、可追蹤的 yaw / pitch / roll。
@@ -59,4 +94,3 @@ outputs/geometry_pose/evaluation/failure_case_debug/
 ```text
 05_Verification/verification_plan.md
 ```
-

@@ -90,8 +90,8 @@ def main() -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Build the geometry yaw/OXTS debug experiment outputs.")
     parser.add_argument("--pose-csv", type=Path, default=Path("outputs/video_pose/pose_timeline.csv"))
-    parser.add_argument("--comparison-csv", type=Path, default=Path("outputs/video_pose/evaluation/pose_vs_oxts.csv"))
-    parser.add_argument("--video", type=Path, default=Path("tools/output/kitti_no_overlay.mp4"))
+    parser.add_argument("--comparison-csv", type=Path, default=Path("outputs/video_pose/evaluation/per_frame.csv"))
+    parser.add_argument("--video", type=Path, default=Path("data/samples/kitti/videos/kitti_no_overlay.mp4"))
     parser.add_argument("--output-dir", type=Path, default=Path("outputs/geometry_yaw_oxts_experiment"))
     parser.add_argument("--write-debug-frames", action=argparse.BooleanOptionalAction, default=True)
     return parser

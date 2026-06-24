@@ -11,6 +11,7 @@ def estimate_yaw(
     image_width: int,
     image_height: int | None = None,
     focal_length_pixels: float | None = None,
+    principal_point_x: float | None = None,
 ) -> YawEstimate:
     vanishing_point = vanishing_point_features.selected_vanishing_point
     if vanishing_point is None:
@@ -24,7 +25,7 @@ def estimate_yaw(
 
     focal_reference = min(image_width, image_height) if image_height is not None else image_width
     focal_length = focal_length_pixels or focal_reference / 2.0
-    center_x = image_width / 2.0
+    center_x = image_width / 2.0 if principal_point_x is None else principal_point_x
     yaw = degrees(atan((vanishing_point.x - center_x) / max(focal_length, 1.0)))
     return YawEstimate(
         yaw=round(yaw, 2),

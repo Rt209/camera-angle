@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-import shutil
 from typing import Any
 
 import numpy as np
 
 from src.app.pipeline import PoseIntegrationPipelineResult, run_stage_4_7_pose_pipeline_on_frame
+from src.contexts.camera_model.domain.intrinsics import CameraIntrinsics
 from src.contexts.input.adapters.video_source import FrameSamplingConfig, VideoMetadata, VideoSource
 from src.contexts.pose_estimation.services.yaw_reliability_gate import apply_video_yaw_reliability
 from src.contexts.output.services.video_pose_writer import (
@@ -15,6 +15,7 @@ from src.contexts.output.services.video_pose_writer import (
     write_pose_timeline_csv,
     write_predicted_overlay_video,
 )
+from src.shared.output_contract import DEBUG_DIRECTORY, FRAME_RESULTS, OVERLAY_VIDEO, POSE_TIMELINE
 
 
 @dataclass(frozen=True)
@@ -26,6 +27,7 @@ class VideoPoseFrameResult:
     pose_result: dict[str, Any]
     feature_metadata: dict[str, Any]
     warnings: list[str]
+    sample_index: int = 0
     failure_reason: str | None = None
 
     @classmethod
@@ -34,6 +36,7 @@ class VideoPoseFrameResult:
         frame_index: int,
         time_sec: float,
         pipeline_result: PoseIntegrationPipelineResult,
+        sample_index: int = 0,
     ) -> "VideoPoseFrameResult":
         pose = pipeline_result.pose_result.to_dict()
         values = [pose.get("yaw"), pose.get("pitch"), pose.get("roll")]
@@ -46,6 +49,7 @@ class VideoPoseFrameResult:
 
         feature_metadata = _feature_metadata(pipeline_result)
         return cls(
+            sample_index=sample_index,
             frame_index=frame_index,
             time_sec=time_sec,
             status=status,
@@ -62,8 +66,10 @@ class VideoPoseFrameResult:
         time_sec: float,
         frame_bgr: np.ndarray | None,
         reason: str,
+        sample_index: int = 0,
     ) -> "VideoPoseFrameResult":
         return cls(
+            sample_index=sample_index,
             frame_index=frame_index,
             time_sec=time_sec,
             status="failed",
@@ -87,6 +93,19 @@ class VideoPoseFrameResult:
         angle_confidence = self.pose_result.get("angle_confidence") or {}
         yaw_reliability = self.feature_metadata.get("yaw_reliability") or {}
         return {
+            "schema_version": "1.0",
+            "pipeline": "geometry",
+            "pose_type": "single_frame_orientation",
+            "sample_index": self.sample_index,
+            "source_frame_index": self.frame_index,
+            "timestamp_sec": round(self.time_sec, 6),
+            "yaw_deg": yaw,
+            "pitch_deg": pitch,
+            "roll_deg": roll,
+            "unit": "degree",
+            "rotation_order": "ZYX",
+            "comparison_ready": bool(yaw_reliability.get("comparison_ready", False)),
+            "line_count": (self.feature_metadata.get("line_features") or {}).get("detected_line_count"),
             "frame_index": self.frame_index,
             "time_sec": round(self.time_sec, 6),
             "yaw": yaw,
@@ -110,6 +129,9 @@ class VideoPoseFrameResult:
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "sample_index": self.sample_index,
+            "source_frame_index": self.frame_index,
+            "timestamp_sec": self.time_sec,
             "frame_index": self.frame_index,
             "time_sec": self.time_sec,
             "status": self.status,
@@ -146,21 +168,31 @@ def run_video_pose_pipeline(
     sampling_config: FrameSamplingConfig,
     write_overlay: bool = False,
     debug_sampled_frames: bool = False,
+    camera_intrinsics: CameraIntrinsics | None = None,
 ) -> VideoPosePipelineResult:
     source = VideoSource(video_path)
     output_dir.mkdir(parents=True, exist_ok=True)
-    debug_root = output_dir / "debug_frames"
+    debug_root = output_dir / DEBUG_DIRECTORY
     frame_results: list[VideoPoseFrameResult] = []
 
-    for sampled in source.iter_sampled_frames(sampling_config):
+    for sample_index, sampled in enumerate(source.iter_sampled_frames(sampling_config)):
         try:
-            frame_debug_dir = debug_root / f"frame_{sampled.frame_index:06d}"
-            pipeline_result = run_stage_4_7_pose_pipeline_on_frame(sampled.frame, frame_debug_dir)
+            frame_debug_dir = (
+                debug_root / f"frame_{sampled.frame_index:06d}"
+                if debug_sampled_frames
+                else None
+            )
+            pipeline_result = run_stage_4_7_pose_pipeline_on_frame(
+                sampled.frame,
+                frame_debug_dir,
+                camera_intrinsics=camera_intrinsics,
+            )
             frame_results.append(
                 VideoPoseFrameResult.from_pipeline_result(
                     sampled.frame_index,
                     sampled.time_sec,
                     pipeline_result,
+                    sample_index=sample_index,
                 )
             )
         except Exception as exc:
@@ -170,28 +202,26 @@ def run_video_pose_pipeline(
                     sampled.time_sec,
                     sampled.frame.image_bgr,
                     f"{type(exc).__name__}: {exc}",
+                    sample_index=sample_index,
                 )
             )
 
     apply_video_yaw_reliability(frame_results, source.metadata.width)
 
-    if not debug_sampled_frames and debug_root.exists():
-        _remove_debug_artifacts_from_results(frame_results)
-        shutil.rmtree(debug_root)
-
-    csv_path = output_dir / "pose_timeline.csv"
-    json_path = output_dir / "frame_pose_results.json"
+    csv_path = output_dir / POSE_TIMELINE
+    json_path = output_dir / FRAME_RESULTS
     write_pose_timeline_csv(frame_results, csv_path)
     write_frame_results_json(
         frame_results,
         json_path,
         video_metadata=source.metadata.to_dict(),
         sampling_config=sampling_config.to_dict(),
+        camera_intrinsics=(camera_intrinsics.to_dict() if camera_intrinsics is not None else None),
     )
 
     overlay_path = None
     if write_overlay:
-        overlay_path = output_dir / "predicted_pose_overlay.mp4"
+        overlay_path = output_dir / OVERLAY_VIDEO
         output_fps = _output_fps(source.metadata.fps, sampling_config)
         write_predicted_overlay_video(
             frame_results,
@@ -267,8 +297,3 @@ def _output_fps(source_fps: float, sampling_config: FrameSamplingConfig) -> floa
         return sampling_config.target_fps
     step = sampling_config.step_for_source_fps(source_fps)
     return max(source_fps / step, 1.0) if source_fps > 0 else 1.0
-
-
-def _remove_debug_artifacts_from_results(frame_results: list[VideoPoseFrameResult]) -> None:
-    for result in frame_results:
-        result.pose_result.get("debug_artifacts", {}).clear()

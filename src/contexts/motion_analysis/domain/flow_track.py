@@ -17,6 +17,7 @@ class FlowVector:
     magnitude: float
     direction_deg: float
     lk_error: float | None = None
+    forward_backward_error: float | None = None
 
     def to_csv_row(self) -> dict[str, object]:
         return {
@@ -32,6 +33,7 @@ class FlowVector:
             "magnitude": self.magnitude,
             "direction_deg": self.direction_deg,
             "lk_error": self.lk_error,
+            "forward_backward_error": self.forward_backward_error,
         }
 
 
@@ -109,4 +111,3 @@ class SparseFlowResult:
             "aggregate": self.aggregate_summary(),
             "frames": [summary.to_dict() for summary in self.frame_summaries],
         }
-

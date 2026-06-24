@@ -21,7 +21,7 @@ from src.contexts.output.services.motion_debug_visualizer import write_sparse_fl
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Analyze sparse optical flow tracks with Shi-Tomasi + LK.")
-    parser.add_argument("--video", type=Path, default=Path("tools/output/kitti_no_overlay.mp4"))
+    parser.add_argument("--video", type=Path, default=Path("data/samples/kitti/videos/kitti_no_overlay.mp4"))
     parser.add_argument("--debug-dir", type=Path, default=Path("outputs/optical_flow_pose/sparse_flow"))
     parser.add_argument("--frame-step", type=int, default=1)
     parser.add_argument("--max-debug-frames", type=int, default=120)
@@ -51,6 +51,7 @@ def main() -> int:
             criteria_eps=args.lk_criteria_eps,
         ),
         frame_step=args.frame_step,
+        write_debug_frames=True,
         max_debug_frames=args.max_debug_frames,
         output_debug_every_n_frames=args.output_debug_every_n_frames,
     )

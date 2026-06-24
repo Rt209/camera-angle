@@ -1,5 +1,11 @@
 # visual-pose-angle-detector
 
+## Evaluation architecture
+
+Reference-based Geometry and Optical Flow evaluation is implemented in `src/contexts/evaluation`, orchestrated by `src/app/evaluation`, and launched by thin terminal wrappers in `tools/evaluation`. OXTS alignment always uses source-frame identity: Geometry aligns one `source_frame_index`, while Optical aligns `source_frame_index_prev` to `source_frame_index_curr`. Readers accept the Phase 1 fields first and retain legacy `frame_index` fallback.
+
+Geometry remains a diagnostic comparison of `single_frame_orientation` in `camera_image_geometry` unless calibrated. Optical remains `frame_to_frame_relative_rotation`; it supports approximate intrinsics or a calibrated KITTI camera profile. Canonical outputs are `per_frame.csv`, `summary.json`, and `evaluation_report.md`; `plots/` and `worst_frames.csv` are created only when requested. Pose Quality Diagnostics and the Interactive CLI are not implemented yet.
+
 這是一個 Python CLI 專案，用來從圖片與影片估計視覺姿態角度，並輸出 yaw、pitch、roll、confidence、JSON、debug images、overlay video 與評估報告。
 
 目前專案包含兩條主要技術路線：
@@ -202,7 +208,7 @@ pytest
 檔案位置：
 
 ```text
-tools/output/kitti_pose_overlay.mp4
+data/samples/kitti/videos/kitti_pose_overlay.mp4
 ```
 
 GitHub 預覽：
@@ -211,26 +217,26 @@ GitHub 預覽：
 
 說明：
 
-這支影片是由內建工具 `tools/dataset/kitti_pose_video.py` 將 `tools/input/images/` 的 KITTI 影像序列與 `tools/input/oxts/` 的官方 yaw / pitch / roll 姿態資料合成而來。
+這支影片是由內建工具 `tools/dataset/kitti_pose_video.py` 將 `data/samples/kitti/images/` 的 KITTI 影像序列與 `data/samples/kitti/references/oxts/` 的官方 yaw / pitch / roll 姿態資料合成而來。
 
 它的用途是人工對照與 debug reference。影片左上角會顯示 KITTI OXTS 官方姿態數值。
 
 可重新產生：
 
 ```bash
-python tools/dataset/kitti_pose_video.py --images tools/input/images --poses tools/input/oxts --output tools/output/kitti_pose_overlay.mp4
+python tools/dataset/kitti_pose_video.py --images data/samples/kitti/images --poses data/samples/kitti/references/oxts --output data/samples/kitti/videos/kitti_pose_overlay.mp4
 ```
 
 如果要產生沒有文字 overlay 的輸入影片，可使用：
 
 ```bash
-python tools/dataset/kitti_pose_video.py --images tools/input/images --poses tools/input/oxts --output tools/output/kitti_no_overlay.mp4 --no-overlay
+python tools/dataset/kitti_pose_video.py --images data/samples/kitti/images --poses data/samples/kitti/references/oxts --output data/samples/kitti/videos/kitti_no_overlay.mp4 --no-overlay
 ```
 
 注意：
 
 ```text
-tools/output/kitti_pose_overlay.mp4
+data/samples/kitti/videos/kitti_pose_overlay.mp4
 ```
 
 不應作為 geometry pose pipeline 的主要演算法輸入，因為影片上的文字 overlay 會污染 edge / line detection。
@@ -240,7 +246,7 @@ tools/output/kitti_pose_overlay.mp4
 檔案位置：
 
 ```text
-outputs/video_pose/predicted_pose_overlay.mp4
+outputs/video_pose/pose_overlay.mp4
 ```
 
 GitHub 預覽：
@@ -254,13 +260,13 @@ GitHub 預覽：
 目前主要輸入影片為：
 
 ```text
-tools/output/kitti_no_overlay.mp4
+data/samples/kitti/videos/kitti_no_overlay.mp4
 ```
 
 可重新產生：
 
 ```bash
-python main.py --video tools/output/kitti_no_overlay.mp4 --sample-every 1 --output-dir outputs/video_pose --write-overlay
+python main.py --video data/samples/kitti/videos/kitti_no_overlay.mp4 --sample-every 1 --output-dir outputs/video_pose --write-overlay
 ```
 
 相關輸出：
@@ -268,7 +274,7 @@ python main.py --video tools/output/kitti_no_overlay.mp4 --sample-every 1 --outp
 ```text
 outputs/video_pose/pose_timeline.csv
 outputs/video_pose/frame_pose_results.json
-outputs/video_pose/predicted_pose_overlay.mp4
+outputs/video_pose/pose_overlay.mp4
 ```
 
 ### 評估報告
@@ -276,13 +282,13 @@ outputs/video_pose/predicted_pose_overlay.mp4
 影片姿態偵測結果與 KITTI OXTS 官方姿態資料的比較報告位於：
 
 ```text
-outputs/video_pose/evaluation/evaluation_report.md
+outputs/<run_id>/eval/geometry/evaluation_report.md
 ```
 
 該文件整理了：
 
-- `pose_vs_oxts.csv` 的逐幀誤差表
-- `pose_vs_oxts_summary.json` 的整體統計
+- `per_frame.csv` 的逐幀誤差表
+- `summary.json` 的整體統計
 - `worst_frames.csv` 的最大誤差 frame
 - yaw / pitch / roll predicted vs OXTS 圖片
 - confidence vs absolute error 圖片
@@ -297,7 +303,7 @@ outputs/video_pose/evaluation/evaluation_report.md
 檔案位置：
 
 ```text
-outputs/optical_flow_pose/pose_overlay_uncalibrated/output_pose_overlay.mp4
+outputs/optical_flow_pose/pose_overlay_uncalibrated/pose_overlay.mp4
 ```
 
 GitHub 預覽：
@@ -311,14 +317,14 @@ GitHub 預覽：
 目前主要輸入影片為：
 
 ```text
-tools/output/kitti_no_overlay.mp4
+data/samples/kitti/videos/kitti_no_overlay.mp4
 ```
 
 可重新產生：
 
 ```bash
 python tools/optical_flow/write_uncalibrated_pose_overlay.py ^
-  --video tools/output/kitti_no_overlay.mp4 ^
+  --video data/samples/kitti/videos/kitti_no_overlay.mp4 ^
   --debug-dir outputs/optical_flow_pose/pose_overlay_uncalibrated ^
   --max-debug-frames 120 ^
   --output-debug-every-n-frames 10
@@ -327,7 +333,7 @@ python tools/optical_flow/write_uncalibrated_pose_overlay.py ^
 相關輸出：
 
 ```text
-outputs/optical_flow_pose/pose_overlay_uncalibrated/output_pose_overlay.mp4
+outputs/optical_flow_pose/pose_overlay_uncalibrated/pose_overlay.mp4
 outputs/optical_flow_pose/pose_overlay_uncalibrated/pose_timeline.csv
 outputs/optical_flow_pose/pose_overlay_uncalibrated/frame_pose_results.json
 outputs/optical_flow_pose/pose_overlay_uncalibrated/debug_frames/
@@ -338,7 +344,7 @@ outputs/optical_flow_pose/pose_overlay_uncalibrated/debug_frames/
 Optical-flow pose 結果與 KITTI OXTS frame-to-frame delta 的比較報告位於：
 
 ```text
-outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation/evaluation_report.md
+outputs/<run_id>/eval/optical/evaluation_report.md
 ```
 
 可重新產生：
@@ -346,14 +352,14 @@ outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation/evaluation_report
 ```bash
 python tools/evaluation/evaluate_uncalibrated_pose_overlay_against_oxts.py ^
   --pose-json outputs/optical_flow_pose/pose_overlay_uncalibrated/frame_pose_results.json ^
-  --oxts-dir tools/input/oxts ^
-  --output-dir outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation
+  --oxts-dir data/samples/kitti/references/oxts ^
+
 ```
 
 該文件整理了：
 
-- `relative_pose_vs_oxts.csv` 的逐幀 relative yaw / pitch / roll 誤差
-- `relative_pose_vs_oxts_summary.json` 的整體統計
+- `per_frame.csv` 的逐幀 relative yaw / pitch / roll 誤差
+- `summary.json` 的整體統計
 - `worst_frames.csv` 的最大誤差 frame
 - yaw / pitch / roll predicted relative vs OXTS delta 圖片
 - confidence vs absolute error 圖片
@@ -365,7 +371,7 @@ python tools/evaluation/evaluate_uncalibrated_pose_overlay_against_oxts.py ^
 
 ```bash
 python tools/optical_flow/analyze_optical_flow_paths.py ^
-  --video tools/output/kitti_no_overlay.mp4 ^
+  --video data/samples/kitti/videos/kitti_no_overlay.mp4 ^
   --debug-dir outputs/optical_flow_pose/sparse_flow ^
   --frame-step 1 ^
   --max-debug-frames 120 ^
@@ -386,8 +392,8 @@ outputs/optical_flow_pose/sparse_flow/debug_frames/
 
 ```bash
 python tools/optical_flow/debug_optical_flow_pose_parameters.py ^
-  --video tools/output/kitti_no_overlay.mp4 ^
-  --oxts-dir tools/input/oxts ^
+  --video data/samples/kitti/videos/kitti_no_overlay.mp4 ^
+  --oxts-dir data/samples/kitti/references/oxts ^
   --output-root outputs/optical_flow_pose/parameter_debug ^
   --debug-root debug/experiments/optical_flow_pose ^
   --max-debug-frames 120 ^
@@ -418,18 +424,18 @@ pose_for_debug_only
 只跑 optical-flow pose 新增測試：
 
 ```bash
-pytest tests/test_sparse_flow_tracker.py ^
-  tests/test_euler_angle_converter.py ^
-  tests/test_essential_pose_estimator.py ^
-  tests/test_uncalibrated_pose_overlay_pipeline.py ^
-  tests/test_evaluate_uncalibrated_pose_overlay_against_oxts.py ^
-  tests/test_debug_optical_flow_pose_parameters.py
+pytest tests/unit/test_sparse_flow_tracker.py ^
+  tests/unit/test_euler_angle_converter.py ^
+  tests/unit/test_essential_pose_estimator.py ^
+  tests/integration/test_uncalibrated_pose_overlay_pipeline.py ^
+  tests/tooling/test_evaluate_uncalibrated_pose_overlay_against_oxts.py ^
+  tests/tooling/test_debug_optical_flow_pose_parameters.py
 ```
 
 確認既有 geometry-based pipeline 沒被破壞：
 
 ```bash
-pytest tests/test_pose_integration_pipeline.py tests/test_visual_pose_pipeline.py
+pytest tests/integration/test_pose_integration_pipeline.py tests/integration/test_visual_pose_pipeline.py
 ```
 
 全部測試：
@@ -437,3 +443,44 @@ pytest tests/test_pose_integration_pipeline.py tests/test_visual_pose_pipeline.p
 ```bash
 pytest
 ```
+# Phase 1 input/output contract
+
+Repository samples now live under `data/samples/kitti/`; user-provided paths remain ordinary `pathlib.Path` inputs. A normal run writes only selected artifacts beneath `outputs/<run_id>/geometry`, `outputs/<run_id>/optical`, or `outputs/<run_id>/eval/<pipeline>`. Pipeline artifacts are `pose_timeline.csv`, `frame_pose_results.json`, and optional `pose_overlay.mp4`/`debug_frames`. Evaluation artifacts are `per_frame.csv`, `summary.json`, `evaluation_report.md`, with plots and worst-frame output created only when requested.
+
+Geometry raw output is a single-frame orientation in `camera_image_geometry`, not an absolute world heading. Optical output is a camera-frame, frame-to-frame relative rotation. Approximate intrinsics carry explicit warnings; calibrated KITTI runs use `P_rect_03` and the IMU-to-camera rotation chain. The Evaluation core is implemented in `src`; Pose Quality Diagnostics, `RunPlanDraft`/`RunPlan`, and the Interactive CLI remain future phases.
+
+Standalone Evaluation commands default to `outputs/<run_id>/eval/geometry` or `outputs/<run_id>/eval/optical`. The existing `--output-dir PATH` argument remains available as an explicit override. Rotation metadata is fixed to `rotation_order=ZYX` and `unit=degree`.
+
+## KITTI 2011-09-26 image_03 calibration
+
+The repository sample is byte-identical to `2011_09_26_drive_0005_sync/image_03`. Its original KITTI calibration files live under `data/samples/kitti/calibration/2011_09_26/`. Run calibrated Optical pose and camera-frame OXTS evaluation with:
+
+```powershell
+$calib = "data/samples/kitti/calibration/2011_09_26"
+
+python main.py `
+  --video data/samples/kitti/videos/kitti_no_overlay.mp4 `
+  --output-dir outputs/kitti_calibrated/geometry `
+  --write-overlay `
+  --kitti-calibration-dir $calib `
+  --kitti-camera-index 03
+
+python tools/optical_flow/write_uncalibrated_pose_overlay.py `
+  --video data/samples/kitti/videos/kitti_no_overlay.mp4 `
+  --debug-dir outputs/kitti_calibrated/optical `
+  --kitti-calibration-dir $calib `
+  --kitti-camera-index 03
+
+python tools/evaluation/evaluate_uncalibrated_pose_overlay_against_oxts.py `
+  --pose-json outputs/kitti_calibrated/optical/frame_pose_results.json `
+  --oxts-dir data/samples/kitti/references/oxts `
+  --output-dir outputs/kitti_calibrated/eval/optical `
+  --kitti-calibration-dir $calib `
+  --kitti-camera-index 03
+```
+
+`P_rect_03` supplies the rectified camera matrix. The evaluator composes IMU-to-Velodyne, Velodyne-to-camera-0, and rectification rotations, then compares OXTS and `recoverPose` camera motion using `R_current.T @ R_previous`.
+
+The Evaluation wrappers derive repository-owned default input and output paths from their own script location, so launching an absolute script path from another working directory still writes beneath this repository. Explicit relative paths retain normal current-working-directory semantics.
+
+Run IDs use local time with fixed-width milliseconds: `YYYYMMDD_HHMMSS_mmm` (for example `20260622_153045_123`). Run ownership is acquired with atomic directory creation; collisions append `_01`, `_02`, and so on. Repository-managed runs include `run_manifest.json`, whose ISO timestamp records the local UTC offset and whose task/artifact entries describe only work actually performed. Artifact filenames themselves remain stable and do not repeat the timestamp.

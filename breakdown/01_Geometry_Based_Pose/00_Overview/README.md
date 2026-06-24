@@ -1,5 +1,17 @@
 # Geometry Based Pose Overview
 
+## Pose Evaluation Metrics
+
+本專案使用 `Precision@θ`、`Recall@θ`、`Geodesic MAE`、`P95 Error` 與 `Jitter` 評估 geometry pose，預設門檻為 `θ = 3.0°`。
+
+- `Precision@θ`：有效姿態中，Geodesic Error 不超過 `θ` 的比例。
+- `Recall@θ`：全部參考影像／影片幀中，成功輸出且誤差不超過 `θ` 的比例。
+- `Geodesic MAE`：SO(3) 最短旋轉角誤差的平均值。
+- `P95 Error`：95% 有效姿態不超過的 Geodesic Error。
+- `Jitter`：geometry video 相鄰幀 rotation-error 變化量的 RMS；單張影像為 N/A。
+
+Raw vanishing-point yaw 是 image geometry yaw，不等於 OXTS absolute heading。未具備 calibrated heading 與 `comparison_ready=true` 時，整體 pose metrics 只能視為 diagnostic，不可宣稱 absolute heading accuracy。
+
 這是 single-image geometry-based pose pipeline 的 overview。
 
 這條技術路線和 `breakdown/02_Optical_Flow_Pose/` 分開管理，核心差異是：
@@ -65,4 +77,3 @@ horizon detection
 | yaw / pitch / roll from geometry cues | relative pose from correspondences |
 | debug images | debug frames / overlay video |
 | first milestone: roll | first milestone: sparse flow |
-

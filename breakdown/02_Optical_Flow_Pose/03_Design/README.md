@@ -1,5 +1,25 @@
 # Optical Flow Pose Design
 
+## Evaluation Module Design
+
+| Logical module | Responsibility | Output |
+|---|---|---|
+| `PoseErrorCalculator` | 將 predicted／OXTS relative Euler angles 轉成 ZYX rotation matrix，計算 SO(3) error | `geodesic_error_deg` |
+| `MetricEvaluator` | 計算 Precision、Recall、Geodesic MAE、P95 | `selected_metrics` |
+| `JitterAnalyzer` | 依連續 frame index 計算 rotation-error change RMS | `jitter_deg` |
+| `ResultLogger` | 寫入精簡 artifacts，依旗標產生 diagnostics | CSV、JSON、Markdown |
+
+預設輸出 contract：
+
+```text
+evaluation/
+  summary.json
+  per_frame.csv
+  evaluation_report.md
+```
+
+`--save-plots` 與 `--save-worst-frames` 才產生額外診斷檔。`summary.json.selected_metrics` 是主要介面；既有逐軸 MAE／RMSE 保留為相容性 diagnostics。
+
 ## 1. 目的
 
 本文件根據 `02_Analysis/README.md` 的 A1 到 A9 架構，整理第一版可實作的 Optical Flow Pose 設計。Design 階段的重點是把 Analysis 的模組、資料交換方式、可用技術與小階段流程轉成清楚的 D1 到 D9 設計模組。
@@ -58,7 +78,7 @@ flowchart TD
     D7 -->|pose_record: json<br/>yaw_pitch_roll: degree<br/>pose_type: relative<br/>warnings: list| D8
     D8 -->|frame_pose_results.json<br/>overlay_metadata.json<br/>annotated_frame: ndarray| D9[D9 Verification Metrics]
     D8 -->|pose_overlay_uncalibrated.mp4| OUT[Output Artifacts]
-    D9 -->|metrics_summary.json<br/>pose_timeline.csv<br/>report.md| OUT
+    D9 -->|summary.json<br/>per_frame.csv<br/>evaluation_report.md| OUT
 ```
 
 ## 4. 建議模組結構
@@ -99,7 +119,7 @@ debug/debug_logger.py
 | D7 | Euler Converter | `R` | yaw, pitch, roll |
 | D7 | Pose Log | pose, metrics, warnings | `pose_record` |
 | D8 | Overlay Renderer | `bgr_frame`, tracks, pose, warnings | `annotated_frame`, frame pose JSON record |
-| D9 | Verification Metrics | `frame_pose_results.json`, optional reference | `metrics_summary.json`, `pose_timeline.csv`, report |
+| D9 | Verification Metrics | `frame_pose_results.json`, optional reference | `summary.json`, `per_frame.csv`, `evaluation_report.md` |
 
 ## 6. 小階段流程設計
 
@@ -130,7 +150,7 @@ flowchart TD
     N -->|annotated_frame ndarray| O[D1 Video Writer]
     N -->|frame_pose_results.json| P[D9 Verification Metrics]
     O -->|pose_overlay_uncalibrated.mp4| Q[Output Artifacts]
-    P -->|metrics_summary.json + pose_timeline.csv + report.md| Q
+    P -->|summary.json + per_frame.csv + evaluation_report.md| Q
 ```
 
 ## 7. 設計決策

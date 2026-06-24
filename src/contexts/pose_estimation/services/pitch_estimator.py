@@ -11,6 +11,7 @@ def estimate_pitch(
     image_width: int,
     image_height: int,
     focal_length_pixels: float | None = None,
+    principal_point_y: float | None = None,
 ) -> PitchEstimate:
     horizon = horizon_features.selected_horizon
     if horizon is None:
@@ -23,7 +24,7 @@ def estimate_pitch(
         )
 
     focal_length = focal_length_pixels or image_width / 2.0
-    center_y = image_height / 2.0
+    center_y = image_height / 2.0 if principal_point_y is None else principal_point_y
     pitch = degrees(atan((center_y - horizon.y_at_center) / max(focal_length, 1.0)))
     return PitchEstimate(
         pitch=round(pitch, 2),
@@ -31,4 +32,3 @@ def estimate_pitch(
         unit="degree",
         method="horizon_based_pitch_estimation",
     )
-

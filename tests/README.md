@@ -44,5 +44,8 @@ pytest tests/unit/test_sparse_flow_tracker.py -v
 1. 依測試責任選擇 `unit`、`integration` 或 `tooling`。
 2. 檔名使用 `test_<被測目標>.py`。
 3. 測試函式使用 `test_<預期行為>`，讓失敗訊息能直接說明情境。
-4. 暫存輸出使用 Pytest 的 `tmp_path`，不要寫進 `tools/output`。
+4. 暫存輸出使用 Pytest 的 `tmp_path`，不要寫進 repository 的 `outputs/`。
 5. 只有需要完整 pipeline 或真實範例影片時，才放進 `integration`。
+# Evaluation test architecture
+
+Evaluation coverage includes OXTS parsing, prediction readers, source-frame alignment, rotation metrics, artifact contracts, application integration, CLI wrappers, and dependency-direction checks. Geometry keeps its 3-degree threshold and Optical keeps 1 degree, preserving pre-migration behavior.

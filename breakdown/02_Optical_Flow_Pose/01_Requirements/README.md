@@ -1,5 +1,18 @@
 # Optical Flow Pose Requirements
 
+## Evaluation Requirements
+
+| ID | Requirement | Acceptance definition |
+|---|---|---|
+| ER-01 | 計算 `Precision@θ` | `correct_valid_predictions / valid_predictions` |
+| ER-02 | 計算 `Recall@θ` | `correct_valid_predictions / reference_frames`；dropout 仍納入分母 |
+| ER-03 | 計算 `Geodesic MAE` | 有效幀 SO(3) Geodesic Error 平均值，單位 degree |
+| ER-04 | 計算 `P95 Error` | 有效幀 Geodesic Error 第 95 百分位 |
+| ER-05 | 計算 `Jitter` | 連續幀 rotation-error Geodesic 變化量的 RMS |
+| ER-06 | 允許設定 `θ` | 預設 `1.0°`，可使用 `--theta-deg` 覆寫 |
+| ER-07 | 使用一致姿態語意 | predicted relative rotation 僅比較 OXTS frame-to-frame delta |
+| ER-08 | 預設精簡輸出 | 僅輸出 `summary.json`、`per_frame.csv`、`evaluation_report.md` |
+
 ## 1. 目的
 
 本文件定義 optical flow camera-pose estimation pipeline 的功能需求、非功能需求、輸入輸出格式與限制條件。

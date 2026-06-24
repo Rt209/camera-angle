@@ -14,6 +14,7 @@ UNCALIBRATED_WARNINGS = ["intrinsics_not_calibrated", "approximate_K_used", "pos
 class ApproximateIntrinsics:
     camera_matrix: np.ndarray
     warnings: list[str]
+    source: str = "approximate_from_image_size"
 
     @classmethod
     def from_image_size(cls, width: int, height: int) -> "ApproximateIntrinsics":
@@ -27,7 +28,7 @@ class ApproximateIntrinsics:
         )
 
     def to_dict(self) -> dict[str, object]:
-        return {"camera_matrix": self.camera_matrix.tolist(), "warnings": self.warnings}
+        return {"camera_matrix": self.camera_matrix.tolist(), "warnings": self.warnings, "source": self.source}
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,13 @@ class RelativePoseEstimate:
     translation_direction: list[float] | None
     inlier_mask: list[bool]
     warnings: list[str] = field(default_factory=list)
+    raw_yaw_deg: float | None = None
+    raw_pitch_deg: float | None = None
+    raw_roll_deg: float | None = None
+    status: str = "accepted"
+    rejection_reason: str | None = None
+    essential_candidate_count: int = 0
+    selected_candidate_index: int | None = None
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -61,6 +69,13 @@ class RelativePoseEstimate:
             "translation_direction": self.translation_direction,
             "inlier_mask": self.inlier_mask,
             "warnings": self.warnings,
+            "raw_yaw_deg": self.raw_yaw_deg,
+            "raw_pitch_deg": self.raw_pitch_deg,
+            "raw_roll_deg": self.raw_roll_deg,
+            "status": self.status,
+            "rejection_reason": self.rejection_reason,
+            "essential_candidate_count": self.essential_candidate_count,
+            "selected_candidate_index": self.selected_candidate_index,
         }
 
 
@@ -70,6 +85,7 @@ class EssentialPoseEstimatorConfig:
     ransac_probability: float = 0.999
     min_points: int = 8
     intrinsics_quality: float = 0.4
+    min_median_parallax_px: float = 0.25
 
 
 class EssentialPoseEstimator:
@@ -106,16 +122,15 @@ class EssentialPoseEstimator:
             warnings.append("essential_matrix_failed")
             return self._empty(frame_index, timestamp_sec, tracked_count, warnings)
 
-        if essential.ndim == 2 and essential.shape[0] > 3:
-            essential = essential[:3, :]
         mask_u8 = mask.astype(np.uint8).reshape(-1, 1)
-        recovered, rotation, translation, pose_mask = cv2.recoverPose(
-            essential[:3, :3],
-            points1,
-            points2,
-            camera_matrix,
-            mask=mask_u8,
-        )
+        candidates = [essential[index:index + 3, :3] for index in range(0, essential.shape[0], 3)]
+        solutions = []
+        for index, candidate in enumerate(candidates):
+            recovered, rotation, translation, pose_mask = cv2.recoverPose(
+                candidate, points1, points2, camera_matrix, mask=mask_u8.copy()
+            )
+            solutions.append((int(recovered), index, rotation, translation, pose_mask))
+        recovered, selected_index, rotation, translation, pose_mask = max(solutions, key=lambda item: item[0])
         pose_mask_bool = (pose_mask.reshape(-1) > 0).tolist() if pose_mask is not None else (mask.reshape(-1) > 0).tolist()
         inlier_count = int(recovered)
         inlier_ratio = inlier_count / tracked_count if tracked_count else 0.0
@@ -123,6 +138,10 @@ class EssentialPoseEstimator:
             warnings.append("too_few_pose_inliers")
 
         angles: EulerAngles = rotation_matrix_to_euler_zyx(rotation)
+        median_parallax = float(np.median(np.linalg.norm(points2 - points1, axis=1)))
+        rejected = median_parallax < self.config.min_median_parallax_px
+        if rejected:
+            warnings.append("low_parallax_degeneracy")
         tracking_quality = min(1.0, tracked_count / 100.0)
         pose_stability = min(1.0, inlier_ratio * 1.5)
         confidence = _clamp(inlier_ratio * tracking_quality * pose_stability * self.config.intrinsics_quality)
@@ -133,13 +152,20 @@ class EssentialPoseEstimator:
             inlier_count=inlier_count,
             inlier_ratio=inlier_ratio,
             confidence=confidence,
-            yaw_deg=angles.yaw_deg,
-            pitch_deg=angles.pitch_deg,
-            roll_deg=angles.roll_deg,
+            yaw_deg=None if rejected else angles.yaw_deg,
+            pitch_deg=None if rejected else angles.pitch_deg,
+            roll_deg=None if rejected else angles.roll_deg,
             rotation_matrix=rotation.astype(float).tolist(),
             translation_direction=translation.reshape(-1).astype(float).tolist(),
             inlier_mask=pose_mask_bool,
             warnings=sorted(set(warnings)),
+            raw_yaw_deg=angles.yaw_deg,
+            raw_pitch_deg=angles.pitch_deg,
+            raw_roll_deg=angles.roll_deg,
+            status="rejected" if rejected else "accepted",
+            rejection_reason="low_parallax_degeneracy" if rejected else None,
+            essential_candidate_count=len(candidates),
+            selected_candidate_index=selected_index,
         )
 
     @staticmethod
@@ -163,9 +189,9 @@ class EssentialPoseEstimator:
             translation_direction=None,
             inlier_mask=[False] * tracked_count,
             warnings=sorted(set(warnings)),
+            status="failed",
         )
 
 
 def _clamp(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
-

@@ -153,12 +153,12 @@ def test_writers_handle_empty_results(tmp_path: Path) -> None:
     write_pose_timeline_csv([], csv_path)
     write_frame_results_json([], json_path, {"fps": 10.0}, {"sample_every": 1})
 
-    assert csv_path.read_text(encoding="utf-8").startswith("frame_index,time_sec")
+    assert csv_path.read_text(encoding="utf-8").startswith("schema_version,pipeline,pose_type")
     assert '"frames": []' in json_path.read_text(encoding="utf-8")
 
 
 def test_overlay_writer_on_and_invalid_output_path(tmp_path: Path) -> None:
-    output_path = tmp_path / "predicted_pose_overlay.mp4"
+    output_path = tmp_path / "pose_overlay.mp4"
 
     write_predicted_overlay_video([_partial_result()], output_path, fps=5.0, size=(64, 48))
 

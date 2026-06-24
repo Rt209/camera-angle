@@ -8,12 +8,16 @@ from src.app.video_pipeline import run_video_pose_pipeline
 from src.cli.parser import build_parser
 from src.app.pipeline import run_stage_4_7_pose_pipeline, run_visual_pose_pipeline
 from src.contexts.input.adapters.video_source import FrameSamplingConfig
+from src.contexts.camera_model.domain.intrinsics import load_camera_intrinsics
+from src.contexts.camera_model.services.kitti_calibration_loader import load_kitti_calibration
 from src.contexts.output.services.rich_table_writer import print_pose_report
 from src.io.file_validator import FileValidationError, resolve_image_path
 from src.metadata.exif_reader import ExifReadError, read_metadata
 from src.output.json_writer import to_json, write_json
 from src.output.rich_table import print_report
 from src.shared.errors import VisualPoseError
+from src.shared.repository_paths import RepositoryPaths
+from src.shared.run_directory import RunDirectoryService
 
 
 def main() -> int:
@@ -22,18 +26,35 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
+        if args.camera_intrinsics and args.kitti_calibration_dir:
+            parser.error(
+                "Use either --camera-intrinsics or --kitti-calibration-dir, not both."
+            )
+        if args.kitti_calibration_dir:
+            camera_intrinsics = load_kitti_calibration(
+                Path(args.kitti_calibration_dir), args.kitti_camera_index
+            ).intrinsics
+        elif args.camera_intrinsics:
+            camera_intrinsics = load_camera_intrinsics(Path(args.camera_intrinsics))
+        else:
+            camera_intrinsics = None
+
         if args.video:
             if args.path:
                 parser.error("Use either --path for a single image or --video for offline video, not both.")
+            output_dir = Path(args.output_dir) if args.output_dir else (
+                RunDirectoryService(RepositoryPaths.discover().outputs_root).next_run_path() / "geometry"
+            )
             result = run_video_pose_pipeline(
                 Path(args.video),
-                Path(args.output_dir),
+                output_dir,
                 sampling_config=FrameSamplingConfig(
                     sample_every=args.sample_every,
                     target_fps=args.target_fps,
                 ),
                 write_overlay=args.write_overlay,
                 debug_sampled_frames=args.debug_sampled_frames,
+                camera_intrinsics=camera_intrinsics,
             )
             data = result.to_dict()
             if args.json:
@@ -58,10 +79,16 @@ def main() -> int:
             report = read_metadata(image_path)
             data = report.to_dict()
         elif args.stage_0_3:
-            result = run_visual_pose_pipeline(image_path, Path(args.debug_dir))
+            result = run_visual_pose_pipeline(
+                image_path, Path(args.debug_dir) if args.debug_dir else None
+            )
             data = result.to_dict()
         else:
-            result = run_stage_4_7_pose_pipeline(image_path, Path(args.debug_dir))
+            result = run_stage_4_7_pose_pipeline(
+                image_path,
+                Path(args.debug_dir) if args.debug_dir else None,
+                camera_intrinsics=camera_intrinsics,
+            )
             data = result.to_dict()
 
         if args.output and not args.json:

@@ -1,5 +1,27 @@
 # Geometry Based Pose Implementation Plan
 
+## Evaluation Metrics Implementation
+
+實作位置：`tools/evaluation/evaluate_video_pose_against_oxts.py`。
+
+| Function | Responsibility |
+|---|---|
+| `compute_precision_at_theta()` | 正確有效姿態數除以有效姿態數 |
+| `compute_recall_at_theta()` | 正確有效姿態數除以全部 reference samples |
+| `compute_geodesic_mae()` | 有效 Geodesic Error 的平均值 |
+| `compute_p95_error()` | 計算 Geodesic Error 第 95 百分位 |
+| `compute_jitter()` | 影片連續 rotation-error change 的 RMS |
+
+```bash
+python tools/evaluation/evaluate_video_pose_against_oxts.py \
+  --pose-csv outputs/video_pose/pose_timeline.csv \
+  --oxts-dir data/samples/kitti/references/oxts \
+
+  --theta-deg 3.0
+```
+
+需要診斷檔時加入 `--save-plots --save-worst-frames`。評估器優先使用 `comparison_ready=true` 的 `calibrated_heading_yaw`；否則沿用 image geometry yaw 並標記為 diagnostic-only。
+
 ## 1. 目的
 
 本文件根據 `02_Analysis/README.md` 與 `03_Design/README.md`，規劃 Geometry Based Pose 第一版實作。Implementation 階段的重點是把 D1 到 D10 設計模組落成可執行階段。
@@ -124,4 +146,6 @@ python main.py --path examples/0.png --debug-dir debug/examples_0
 04_Implementation/stage_4_7_pose_integration_and_debug.md
 04_Implementation/stage_8_10_validation_video_realtime.md
 ```
+# Evaluation core migration
 
+Geometry reference-based evaluation now runs through `src/app/evaluation/geometry_service.py`. Prediction reading, OXTS loading, source-frame alignment, ZYX/geodesic math, metrics, and artifact services are owned by `src/contexts/evaluation`. Raw Geometry yaw remains diagnostic-only unless calibrated; the migration does not change its formulas or pose semantics.

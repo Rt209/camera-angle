@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from src.contexts.camera_model.domain.intrinsics import CameraIntrinsics
 from src.contexts.geometry_features.domain.line_feature_set import LineFeatureSet
 from src.contexts.geometry_features.domain.horizon_feature_set import HorizonFeatureSet
 from src.contexts.geometry_features.domain.vanishing_point_feature_set import VanishingPointFeatureSet
@@ -74,7 +75,7 @@ class PoseIntegrationPipelineResult:
 
 def run_visual_pose_pipeline(
     image_path: Path,
-    debug_dir: Path,
+    debug_dir: Path | None = None,
     preprocess_config: PreprocessConfig | None = None,
     line_config: LineDetectionConfig | None = None,
 ) -> VisualPosePipelineResult:
@@ -88,9 +89,10 @@ def run_visual_pose_pipeline(
     roll_estimate = estimate_roll(line_features)
 
     debug_artifacts: dict[str, str] = {}
-    debug_artifacts.update(write_preprocessing_debug(debug_dir, preprocessed, edge_map))
-    debug_artifacts.update(write_line_debug(debug_dir, preprocessed, line_features))
-    debug_artifacts.update(write_roll_debug(debug_dir, preprocessed, line_features, roll_estimate))
+    if debug_dir is not None:
+        debug_artifacts.update(write_preprocessing_debug(debug_dir, preprocessed, edge_map))
+        debug_artifacts.update(write_line_debug(debug_dir, preprocessed, line_features))
+        debug_artifacts.update(write_roll_debug(debug_dir, preprocessed, line_features, roll_estimate))
 
     warnings = []
     if roll_estimate.roll is None:
@@ -122,11 +124,12 @@ def run_visual_pose_pipeline(
 
 def run_stage_4_7_pose_pipeline(
     image_path: Path,
-    debug_dir: Path,
+    debug_dir: Path | None = None,
     preprocess_config: PreprocessConfig | None = None,
     line_config: LineDetectionConfig | None = None,
     horizon_config: HorizonDetectionConfig | None = None,
     vanishing_point_config: VanishingPointDetectionConfig | None = None,
+    camera_intrinsics: CameraIntrinsics | None = None,
 ) -> PoseIntegrationPipelineResult:
     frame = load_frame(image_path)
     return run_stage_4_7_pose_pipeline_on_frame(
@@ -136,16 +139,18 @@ def run_stage_4_7_pose_pipeline(
         line_config=line_config,
         horizon_config=horizon_config,
         vanishing_point_config=vanishing_point_config,
+        camera_intrinsics=camera_intrinsics,
     )
 
 
 def run_stage_4_7_pose_pipeline_on_frame(
     frame: Frame,
-    debug_dir: Path,
+    debug_dir: Path | None = None,
     preprocess_config: PreprocessConfig | None = None,
     line_config: LineDetectionConfig | None = None,
     horizon_config: HorizonDetectionConfig | None = None,
     vanishing_point_config: VanishingPointDetectionConfig | None = None,
+    camera_intrinsics: CameraIntrinsics | None = None,
 ) -> PoseIntegrationPipelineResult:
     preprocess_config = preprocess_config or PreprocessConfig()
     line_config = line_config or LineDetectionConfig()
@@ -166,24 +171,44 @@ def run_stage_4_7_pose_pipeline_on_frame(
         vanishing_point_config,
     )
 
+    camera_matrix = (
+        camera_intrinsics.camera_matrix_for_size(
+            preprocessed.width, preprocessed.height
+        )
+        if camera_intrinsics is not None
+        else None
+    )
     roll_estimate = estimate_roll(line_features)
-    pitch_estimate = estimate_pitch(horizon_features, preprocessed.width, preprocessed.height)
-    yaw_estimate = estimate_yaw(vanishing_point_features, preprocessed.width, preprocessed.height)
+    pitch_estimate = estimate_pitch(
+        horizon_features,
+        preprocessed.width,
+        preprocessed.height,
+        focal_length_pixels=(float(camera_matrix[1, 1]) if camera_matrix is not None else None),
+        principal_point_y=(float(camera_matrix[1, 2]) if camera_matrix is not None else None),
+    )
+    yaw_estimate = estimate_yaw(
+        vanishing_point_features,
+        preprocessed.width,
+        preprocessed.height,
+        focal_length_pixels=(float(camera_matrix[0, 0]) if camera_matrix is not None else None),
+        principal_point_x=(float(camera_matrix[0, 2]) if camera_matrix is not None else None),
+    )
 
     warnings = _stage_4_7_warnings(roll_estimate, pitch_estimate, yaw_estimate)
     debug_artifacts: dict[str, str] = {}
-    debug_artifacts.update(write_preprocessing_debug(debug_dir, preprocessed, edge_map))
-    debug_artifacts.update(write_line_debug(debug_dir, preprocessed, line_features))
-    debug_artifacts.update(write_roll_debug(debug_dir, preprocessed, line_features, roll_estimate))
-    debug_artifacts.update(write_horizon_debug(debug_dir, preprocessed, horizon_features, pitch_estimate.pitch))
-    debug_artifacts.update(
-        write_vanishing_point_debug(
-            debug_dir,
-            preprocessed,
-            vanishing_point_features,
-            yaw_estimate.yaw,
+    if debug_dir is not None:
+        debug_artifacts.update(write_preprocessing_debug(debug_dir, preprocessed, edge_map))
+        debug_artifacts.update(write_line_debug(debug_dir, preprocessed, line_features))
+        debug_artifacts.update(write_roll_debug(debug_dir, preprocessed, line_features, roll_estimate))
+        debug_artifacts.update(write_horizon_debug(debug_dir, preprocessed, horizon_features, pitch_estimate.pitch))
+        debug_artifacts.update(
+            write_vanishing_point_debug(
+                debug_dir,
+                preprocessed,
+                vanishing_point_features,
+                yaw_estimate.yaw,
+            )
         )
-    )
 
     pose_result = build_pose_result(
         image=frame.filename,
@@ -194,7 +219,8 @@ def run_stage_4_7_pose_pipeline_on_frame(
         debug_artifacts=debug_artifacts,
         warnings=warnings,
     )
-    debug_artifacts.update(write_pose_overlay(debug_dir, preprocessed, horizon_features, vanishing_point_features, pose_result))
+    if debug_dir is not None:
+        debug_artifacts.update(write_pose_overlay(debug_dir, preprocessed, horizon_features, vanishing_point_features, pose_result))
     pose_result = build_pose_result(
         image=frame.filename,
         yaw=yaw_estimate,

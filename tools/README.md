@@ -38,26 +38,30 @@ tools/
 ```powershell
 # 建立 KITTI 測試影片
 python tools/dataset/kitti_pose_video.py `
-  --images tools/input/images `
-  --poses tools/input/oxts `
-  --output tools/output/kitti_no_overlay.mp4 `
+  --images data/samples/kitti/images `
+  --poses data/samples/kitti/references/oxts `
+  --output data/samples/kitti/videos/kitti_no_overlay.mp4 `
   --no-overlay
 
 # 分析 Optical Flow 路徑
 python tools/optical_flow/analyze_optical_flow_paths.py `
-  --video tools/output/kitti_no_overlay.mp4 `
+  --video data/samples/kitti/videos/kitti_no_overlay.mp4 `
   --debug-dir outputs/optical_flow_pose/sparse_flow
 
 # 產生 Optical Flow pose Overlay
 python tools/optical_flow/write_uncalibrated_pose_overlay.py `
-  --video tools/output/kitti_no_overlay.mp4 `
-  --debug-dir outputs/optical_flow_pose/pose_overlay_uncalibrated
+  --video data/samples/kitti/videos/kitti_no_overlay.mp4 `
+  --debug-dir outputs/optical_flow_pose/pose_overlay_uncalibrated `
+  --kitti-calibration-dir data/samples/kitti/calibration/2011_09_26 `
+  --kitti-camera-index 03
 
 # 執行 Optical Flow pose 評估
 python tools/evaluation/evaluate_uncalibrated_pose_overlay_against_oxts.py `
   --pose-json outputs/optical_flow_pose/pose_overlay_uncalibrated/frame_pose_results.json `
-  --oxts-dir tools/input/oxts `
-  --output-dir outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation
+  --oxts-dir data/samples/kitti/references/oxts `
+  --kitti-calibration-dir data/samples/kitti/calibration/2011_09_26 `
+  --kitti-camera-index 03
+
 ```
 
 ## 維護原則
@@ -66,4 +70,10 @@ python tools/evaluation/evaluate_uncalibrated_pose_overlay_against_oxts.py `
 - 新工具必須放入對應功能資料夾，不直接堆在 `tools` 根目錄。
 - 輸入範例放在 `input`；可重建的產物放在 `output` 或 repository 根目錄的 `outputs`。
 - 新增或移動工具時，必須同步更新 `tests/tooling`、本 README 與 breakdown 文件中的命令。
+# Phase 1 contract status
 
+Tools consume repository samples from `data/samples/kitti` and call the existing `src` APIs. Evaluation writers use `per_frame.csv`, `summary.json`, and `evaluation_report.md`; optional plots and `worst_frames.csv` are emitted only when explicitly selected. Evaluation domain logic now lives in `src/contexts/evaluation`, application orchestration in `src/app/evaluation`, and `tools/evaluation` contains terminal wrappers only.
+
+When `--output-dir` is omitted, the wrappers resolve a collision-safe `outputs/<run_id>/eval/<pipeline>` directory without creating it until evaluation succeeds. Supplying `--output-dir` preserves the legacy override behavior.
+
+The run ID format is `YYYYMMDD_HHMMSS_mmm`. Standalone Evaluation validates prediction/reference inputs before atomically reserving the run directory, then writes only its selected evaluation subtree plus `run_manifest.json`. Canonical artifact filenames remain unchanged.

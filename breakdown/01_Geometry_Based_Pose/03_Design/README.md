@@ -1,5 +1,26 @@
 # Geometry Based Pose Design
 
+## Evaluation Module Design
+
+| Logical module | Responsibility | Output |
+|---|---|---|
+| `PoseErrorCalculator` | 將 predicted／reference YPR 轉成 ZYX rotation matrix並計算 SO(3) error | `geodesic_error_deg` |
+| `MetricEvaluator` | 計算 Precision、Recall、Geodesic MAE 與 P95 | `selected_metrics` |
+| `JitterAnalyzer` | geometry video 依連續 frame index 計算 rotation-error change RMS | `jitter_deg` |
+| `PoseSemanticsGuard` | 選用 calibrated heading，否則標記 raw image geometry yaw 為 diagnostic | `comparison_ready`, warnings |
+| `ResultLogger` | 寫入精簡 artifacts，依旗標產生 plots／worst frames | CSV、JSON、Markdown |
+
+為保留既有 yaw debug／calibration 工具相容性，Geometry eval 使用：
+
+```text
+evaluation/
+  per_frame.csv
+  summary.json
+  evaluation_report.md
+```
+
+`--save-plots` 與 `--save-worst-frames` 才產生額外診斷檔案。
+
 ## 1. 目的
 
 本文件根據 `02_Analysis/README.md` 的 A1 到 A10 架構，整理 Geometry Based Pose 的設計入口。Design 階段的重點是把 Analysis 的模組、資料交換方式、可用技術與小階段流程轉成可實作的 D1 到 D10 設計模組。
@@ -128,4 +149,3 @@ flowchart TD
 03_Design/system_design_breakdown.md
 03_Design/bounded_context_map.md
 ```
-

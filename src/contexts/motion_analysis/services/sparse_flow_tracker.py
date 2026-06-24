@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import cv2
@@ -33,11 +33,17 @@ class SparseFlowTrackerConfig:
     feature: ShiTomasiConfig = ShiTomasiConfig()
     lk: LucasKanadeConfig = LucasKanadeConfig()
     frame_step: int = 1
+    max_processing_frames: int | None = None
+    write_debug_frames: bool = False
     max_debug_frames: int = 120
     output_debug_every_n_frames: int = 10
     min_valid_tracks: int = 10
     redetect_below: int = 50
     max_path_length: int = 80
+    forward_backward_max_error_px: float = 1.5
+    spatial_grid_rows: int = 3
+    spatial_grid_cols: int = 4
+    min_occupied_grid_cells: int = 4
 
 
 class SparseFlowTracker:
@@ -53,7 +59,7 @@ class SparseFlowTracker:
             fps=source.metadata.fps,
             image_width=source.metadata.width,
             image_height=source.metadata.height,
-            max_frames=self.config.max_debug_frames,
+            max_frames=self.config.max_processing_frames,
         )
 
     def track_sampled_frames(
@@ -114,11 +120,22 @@ class SparseFlowTracker:
                     valid_mask = status.reshape(-1) == 1
                     prev_flat = prev_points.reshape(-1, 2)
                     curr_flat = curr_points.reshape(-1, 2)
+                    backward, backward_status, _ = cv2.calcOpticalFlowPyrLK(
+                        curr_gray, prev_gray, curr_points, None,
+                        winSize=self.config.lk.win_size, maxLevel=self.config.lk.max_level,
+                        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT,
+                                  self.config.lk.criteria_count, self.config.lk.criteria_eps),
+                    )
+                    backward_flat = backward.reshape(-1, 2) if backward is not None else np.full_like(prev_flat, np.nan)
+                    backward_valid = backward_status.reshape(-1) == 1 if backward_status is not None else np.zeros(len(prev_flat), dtype=bool)
+                    fb_errors = np.linalg.norm(backward_flat - prev_flat, axis=1)
                     err_flat = errors.reshape(-1) if errors is not None else np.full(len(prev_flat), np.nan)
                     new_points = []
                     new_track_ids = []
                     for index, valid in enumerate(valid_mask):
-                        if not valid or not np.all(np.isfinite(curr_flat[index])):
+                        if (not valid or not backward_valid[index] or not np.all(np.isfinite(curr_flat[index]))
+                                or not np.isfinite(fb_errors[index])
+                                or fb_errors[index] > self.config.forward_backward_max_error_px):
                             continue
                         track_id = track_ids[index]
                         vector = self._flow_vector(
@@ -128,6 +145,7 @@ class SparseFlowTracker:
                             prev_flat[index],
                             curr_flat[index],
                             float(err_flat[index]) if np.isfinite(err_flat[index]) else None,
+                            float(fb_errors[index]),
                         )
                         vectors.append(vector)
                         new_points.append(curr_flat[index])
@@ -147,10 +165,16 @@ class SparseFlowTracker:
                 vectors=vectors,
                 min_valid_tracks=self.config.min_valid_tracks,
             )
+            occupied = self._occupied_grid_cells(vectors, image_width, image_height)
+            if vectors and occupied < self.config.min_occupied_grid_cells:
+                summary = replace(summary, warnings=sorted(set(summary.warnings + ["insufficient_spatial_coverage"])))
             summaries.append(summary)
             all_vectors.extend(vectors)
 
-            if self._should_keep_debug_frame(sampled.frame_index):
+            if (
+                self._should_keep_debug_frame(sampled.frame_index)
+                and len(debug_frames) < self.config.max_debug_frames
+            ):
                 debug_frames.append(
                     FlowDebugFrame(
                         frame_index=sampled.frame_index,
@@ -229,6 +253,8 @@ class SparseFlowTracker:
         return merged, ids, next_track_id
 
     def _should_keep_debug_frame(self, frame_index: int) -> bool:
+        if not self.config.write_debug_frames:
+            return False
         every = max(1, self.config.output_debug_every_n_frames)
         return frame_index % every == 0
 
@@ -244,6 +270,7 @@ class SparseFlowTracker:
         start: np.ndarray,
         end: np.ndarray,
         lk_error: float | None,
+        forward_backward_error: float | None = None,
     ) -> FlowVector:
         dx = float(end[0] - start[0])
         dy = float(end[1] - start[1])
@@ -262,5 +289,15 @@ class SparseFlowTracker:
             magnitude=magnitude,
             direction_deg=direction,
             lk_error=lk_error,
+            forward_backward_error=forward_backward_error,
         )
 
+    def _occupied_grid_cells(self, vectors: list[FlowVector], width: int, height: int) -> int:
+        if width <= 0 or height <= 0:
+            return 0
+        cells = {
+            (min(self.config.spatial_grid_rows - 1, int(v.y0 * self.config.spatial_grid_rows / height)),
+             min(self.config.spatial_grid_cols - 1, int(v.x0 * self.config.spatial_grid_cols / width)))
+            for v in vectors
+        }
+        return len(cells)

@@ -1,5 +1,23 @@
 # Geometry Based Pose Analysis
 
+## Evaluation Metric Analysis
+
+`Precision@θ` 衡量有效輸出的可信比例，`Recall@θ` 把無法從 lines、horizon 或 vanishing point 取得姿態的樣本納入，避免只評估容易場景。Geometry 預設採用 `θ = 3.0°`，並可另外報告 1°／5° 門檻。
+
+`Geodesic MAE` 以完整旋轉衡量誤差：
+
+```text
+R_error = R_pred * transpose(R_gt)
+e_geo = acos(clamp((trace(R_error) - 1) / 2, -1, 1))
+Geodesic MAE = mean(e_geo)
+```
+
+此方式可避免只看逐軸 Euler error 時忽略軸耦合。`P95 Error` 用來揭露少量 VP side flip、horizon selection failure 或線段不足造成的尾端大誤差。
+
+`Jitter` 僅適用 geometry video。影片本身可能正在轉動，因此先計算 predicted-vs-reference rotation error，再對連續 error rotations 的變化量取 RMS；單張影像沒有時間序列，Jitter 應為 N/A。
+
+目前 raw VP yaw 與 OXTS absolute heading 不同座標語意。未完成 camera-to-vehicle transform、heading calibration 並設為 `comparison_ready` 前，Geodesic／Precision／Recall 的整體 pose 結果只供除錯；pitch、roll 仍應個別檢查其座標定義。
+
 ## 1. 目的
 
 本文件負責整理「若要完成 Geometry Based Pose 這個主題，需要拆成哪些分析架構與模組」。Analysis 階段不直接決定程式檔案怎麼切，而是先定義問題邊界、模組資料流、可用技術與最後流程。
@@ -315,4 +333,3 @@ flowchart TD
 02_Analysis/geometry_pose_analysis.md
 02_Analysis/technology_selection_rationale.md
 ```
-

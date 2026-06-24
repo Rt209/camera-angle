@@ -3,7 +3,7 @@ import csv
 import json
 import math
 
-from tools.evaluation.evaluate_video_pose_against_oxts import (
+from src.contexts.evaluation.services.geometry_evaluator import (
     build_summary,
     build_worst_frames,
     evaluate_rows,
@@ -11,7 +11,8 @@ from tools.evaluation.evaluate_video_pose_against_oxts import (
     run_evaluation,
     write_evaluation_outputs,
 )
-from tools.dataset.kitti_pose_video import PoseAngles, load_poses
+from src.contexts.evaluation.domain.pose_record import PoseAngles
+from src.contexts.evaluation.services.oxts_loader import load_poses
 
 
 def _write_pose_csv(path: Path) -> None:
@@ -236,8 +237,8 @@ def test_run_evaluation_writes_expected_files(tmp_path: Path) -> None:
     assert outputs.plot_paths == {}
     assert sorted(path.name for path in (tmp_path / "evaluation").iterdir()) == [
         "evaluation_report.md",
-        "pose_vs_oxts.csv",
-        "pose_vs_oxts_summary.json",
+        "per_frame.csv",
+        "summary.json",
     ]
 
 

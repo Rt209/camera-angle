@@ -1,5 +1,27 @@
 # Optical Flow Pose Implementation Plan
 
+## Evaluation Metrics Implementation
+
+實作位置：`tools/evaluation/evaluate_uncalibrated_pose_overlay_against_oxts.py`。
+
+| Function | Responsibility |
+|---|---|
+| `compute_precision_at_theta()` | 正確有效預測數除以有效預測數 |
+| `compute_recall_at_theta()` | 正確有效預測數除以全部 reference rows |
+| `compute_geodesic_mae()` | 有效 Geodesic Error 的平均值 |
+| `compute_p95_error()` | 計算 Geodesic Error 第 95 百分位 |
+| `compute_jitter()` | 計算連續 rotation-error change 的 RMS |
+
+```bash
+python tools/evaluation/evaluate_uncalibrated_pose_overlay_against_oxts.py \
+  --pose-json outputs/optical_flow_pose/pose_overlay_uncalibrated/frame_pose_results.json \
+  --oxts-dir data/samples/kitti/references/oxts \
+
+  --theta-deg 1.0
+```
+
+需要診斷檔時加入 `--save-plots --save-worst-frames`。
+
 ## 1. 目的
 
 本文件根據 `02_Analysis/README.md` 與 `03_Design/README.md`，規劃 Optical Flow Pose 第一版實作。Implementation 階段的重點是把 D1 到 D9 設計模組落成可執行 tools，並維持 Analysis 定義的資料傳遞格式。
@@ -46,7 +68,7 @@ flowchart TD
     P8 -->|annotated_frame ndarray| P1W[P1 Video Writer]
     P8 -->|frame_pose_results.json| P9[P9 Verification]
     P1W -->|pose_overlay_uncalibrated.mp4| OUT[Artifacts]
-    P9 -->|metrics_summary.json + pose_timeline.csv + report.md| OUT
+    P9 -->|summary.json + per_frame.csv + evaluation_report.md| OUT
 ```
 
 ## 4. Data Contract
@@ -131,9 +153,9 @@ outputs/optical_flow_pose/sparse_flow/
 outputs/optical_flow_pose/pose_overlay_uncalibrated/pose_overlay.mp4
 outputs/optical_flow_pose/pose_overlay_uncalibrated/frame_pose_results.json
 outputs/optical_flow_pose/pose_overlay_uncalibrated/overlay_metadata.json
-outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation/metrics_summary.json
-outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation/pose_timeline.csv
-outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation/report.md
+outputs/<run_id>/eval/optical/summary.json
+outputs/<run_id>/eval/optical/per_frame.csv
+outputs/<run_id>/eval/optical/evaluation_report.md
 outputs/optical_flow_pose/parameter_debug/
 debug/experiments/optical_flow_pose/
 ```
@@ -143,10 +165,10 @@ debug/experiments/optical_flow_pose/
 第一版 tools：
 
 ```bash
-python tools/optical_flow/analyze_optical_flow_paths.py --video tools/output/kitti_no_overlay.mp4 --debug-dir outputs/optical_flow_pose/sparse_flow
-python tools/optical_flow/write_uncalibrated_pose_overlay.py --video tools/output/kitti_no_overlay.mp4 --debug-dir outputs/optical_flow_pose/pose_overlay_uncalibrated
-python tools/evaluation/evaluate_uncalibrated_pose_overlay_against_oxts.py --pose-json outputs/optical_flow_pose/pose_overlay_uncalibrated/frame_pose_results.json --oxts-dir tools/input/oxts --output-dir outputs/optical_flow_pose/pose_overlay_uncalibrated/evaluation
-python tools/optical_flow/debug_optical_flow_pose_parameters.py --video tools/output/kitti_no_overlay.mp4 --oxts-dir tools/input/oxts --output-root outputs/optical_flow_pose/parameter_debug --debug-root debug/experiments/optical_flow_pose
+python tools/optical_flow/analyze_optical_flow_paths.py --video data/samples/kitti/videos/kitti_no_overlay.mp4 --debug-dir outputs/optical_flow_pose/sparse_flow
+python tools/optical_flow/write_uncalibrated_pose_overlay.py --video data/samples/kitti/videos/kitti_no_overlay.mp4 --debug-dir outputs/optical_flow_pose/pose_overlay_uncalibrated
+python tools/evaluation/evaluate_uncalibrated_pose_overlay_against_oxts.py --pose-json outputs/optical_flow_pose/pose_overlay_uncalibrated/frame_pose_results.json --oxts-dir data/samples/kitti/references/oxts
+python tools/optical_flow/debug_optical_flow_pose_parameters.py --video data/samples/kitti/videos/kitti_no_overlay.mp4 --oxts-dir data/samples/kitti/references/oxts --output-root outputs/optical_flow_pose/parameter_debug --debug-root debug/experiments/optical_flow_pose
 ```
 
 整合 pipeline：
@@ -173,3 +195,16 @@ python main.py --path pose_video.mp4 --optical-flow-pose --intrinsics-mode appro
 - RANSAC inlier ratio 低於門檻時會輸出 unreliable pose record。
 - overlay video 可看見 tracks、inliers/outliers、yaw / pitch / roll、confidence、warnings。
 - verification report 不宣稱 absolute pose 對齊，只描述 relative pose debug stability。
+# Evaluation core migration
+
+Optical reference-based evaluation now runs through `src/app/evaluation/optical_flow_service.py`. Alignment uses explicit previous/current source-frame identities to construct the OXTS delta, with legacy `frame_index` and `frame_index - 1` fallback. Approximate-intrinsics warnings and the 1-degree threshold are unchanged.
+
+## 2026-06 Stability contract
+
+- 正式執行預設不寫 debug PNG；`--write-debug-frames`、間隔與最大張數皆為 opt-in，且 `max_debug_frames` 不限制處理 frame 數。
+- 可用 `--camera-intrinsics camera_intrinsics.json` 載入既有 calibration；尺寸同比例縮放時同步縮放 `fx/fy/cx/cy`，不同長寬比直接拒絕。
+- KITTI sample 已整合 `2011_09_26` calibration；目前影像串流經雜湊確認為 `image_03`，可用 `--kitti-calibration-dir ... --kitti-camera-index 03` 直接讀取 `P_rect_03`。
+- KITTI OXTS camera-motion comparison 使用 `R_current.T @ R_previous`，以符合 OpenCV `recoverPose` 從前一相機座標到目前相機座標的旋轉方向。
+- LK tracks 經 forward-backward consistency 過濾並檢查 image-grid coverage。
+- `findEssentialMat` 回傳多組 3x3 candidates 時逐組執行 `recoverPose`，記錄 candidate count 與選中索引。
+- 每列同時保留 raw rotation 與 accepted/filtered rotation；低視差或超過 geodesic temporal threshold 的結果標成 `rejected`，不做 Euler clamp。

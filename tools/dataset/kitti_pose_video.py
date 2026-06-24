@@ -1,31 +1,26 @@
 from __future__ import annotations
 
 import argparse
-import math
-import re
-from dataclasses import dataclass
+import sys
 from pathlib import Path
 from typing import Iterable
 
 import cv2
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.contexts.evaluation.domain.pose_record import PoseAngles
+from src.contexts.evaluation.services.oxts_loader import load_poses, natural_key, parse_pose_text
+
 
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff"}
-TOOLS_DIR = Path(__file__).resolve().parents[1]
-DEFAULT_IMAGE_DIR = TOOLS_DIR / "input" / "images"
-DEFAULT_POSE_DIR = TOOLS_DIR / "input" / "oxts"
-DEFAULT_OUTPUT_PATH = TOOLS_DIR / "output" / "kitti_pose_overlay.mp4"
-
-
-@dataclass(frozen=True)
-class PoseAngles:
-    yaw_deg: float
-    pitch_deg: float
-    roll_deg: float
-
-
-def natural_key(path: Path) -> list[object]:
-    return [int(part) if part.isdigit() else part.lower() for part in re.split(r"(\d+)", path.name)]
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+SAMPLE_ROOT = REPOSITORY_ROOT / "data" / "samples" / "kitti"
+DEFAULT_IMAGE_DIR = SAMPLE_ROOT / "images"
+DEFAULT_POSE_DIR = SAMPLE_ROOT / "references" / "oxts"
+DEFAULT_OUTPUT_PATH = SAMPLE_ROOT / "videos" / "kitti_pose_overlay.mp4"
 
 
 def list_images(image_dir: Path) -> list[Path]:
@@ -38,53 +33,6 @@ def list_images(image_dir: Path) -> list[Path]:
     if not images:
         raise ValueError(f"No images found in: {image_dir}")
     return images
-
-
-def parse_pose_text(text: str) -> PoseAngles | None:
-    labelled = {
-        key: re.search(rf"{key}\s*:\s*([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)", text)
-        for key in ("yaw_deg", "pitch_deg", "roll_deg")
-    }
-    if all(match is not None for match in labelled.values()):
-        return PoseAngles(
-            yaw_deg=float(labelled["yaw_deg"].group(1)),
-            pitch_deg=float(labelled["pitch_deg"].group(1)),
-            roll_deg=float(labelled["roll_deg"].group(1)),
-        )
-
-    numeric_line = next(
-        (line for line in text.splitlines() if re.match(r"^\s*[-+]?\d", line)),
-        "",
-    )
-    values = [float(value) for value in numeric_line.split()]
-    if len(values) >= 6:
-        # KITTI raw OXTS stores: lat lon alt roll pitch yaw ... with angles in radians.
-        roll_rad, pitch_rad, yaw_rad = values[3], values[4], values[5]
-        return PoseAngles(
-            yaw_deg=math.degrees(yaw_rad),
-            pitch_deg=math.degrees(pitch_rad),
-            roll_deg=math.degrees(roll_rad),
-        )
-    return None
-
-
-def load_poses(pose_path: Path) -> list[PoseAngles]:
-    if pose_path.is_dir():
-        txt_files = sorted(pose_path.glob("*.txt"), key=natural_key)
-        poses = [parse_pose_text(path.read_text(encoding="utf-8", errors="replace")) for path in txt_files]
-    elif pose_path.is_file():
-        text = pose_path.read_text(encoding="utf-8", errors="replace")
-        if "yaw_deg" in text and "pitch_deg" in text and "roll_deg" in text:
-            poses = [parse_pose_text(text)]
-        else:
-            poses = [parse_pose_text(line) for line in text.splitlines() if line.strip()]
-    else:
-        raise ValueError(f"Pose path does not exist: {pose_path}")
-
-    valid_poses = [pose for pose in poses if pose is not None]
-    if not valid_poses:
-        raise ValueError(f"No KITTI pose records found in: {pose_path}")
-    return valid_poses
 
 
 def draw_pose_overlay(frame, pose: PoseAngles, frame_index: int, total_frames: int):

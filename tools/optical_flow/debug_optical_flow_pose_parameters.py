@@ -22,7 +22,7 @@ from src.contexts.motion_analysis.domain.flow_track import FlowVector  # noqa: E
 from src.contexts.motion_analysis.services.sparse_flow_tracker import SparseFlowTrackerConfig  # noqa: E402
 from src.contexts.output.services.motion_debug_visualizer import draw_flow_vectors  # noqa: E402
 from src.contexts.output.services.optical_flow_pose_visualizer import draw_uncalibrated_pose_overlay  # noqa: E402
-from tools.evaluation.evaluate_uncalibrated_pose_overlay_against_oxts import run_evaluation  # noqa: E402
+from src.contexts.evaluation.services.optical_flow_evaluator import run_evaluation  # noqa: E402
 
 
 OUTLIER_FRAMES = [34, 35, 38, 73, 76, 77, 79, 80, 86, 97, 101, 103, 117, 118, 119]
@@ -30,8 +30,8 @@ OUTLIER_FRAMES = [34, 35, 38, 73, 76, 77, 79, 80, 86, 97, 101, 103, 117, 118, 11
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run optical-flow pose baseline and outlier-frame deep dive.")
-    parser.add_argument("--video", type=Path, default=Path("tools/output/kitti_no_overlay.mp4"))
-    parser.add_argument("--oxts-dir", type=Path, default=Path("tools/input/oxts"))
+    parser.add_argument("--video", type=Path, default=Path("data/samples/kitti/videos/kitti_no_overlay.mp4"))
+    parser.add_argument("--oxts-dir", type=Path, default=Path("data/samples/kitti/references/oxts"))
     parser.add_argument("--output-root", type=Path, default=Path("outputs/optical_flow_pose/parameter_debug"))
     parser.add_argument("--debug-root", type=Path, default=Path("debug/experiments/optical_flow_pose"))
     parser.add_argument("--max-debug-frames", type=int, default=120)
@@ -53,8 +53,12 @@ def main() -> int:
     _prepare_dir(deep_dive_debug, PROJECT_ROOT / "debug")
 
     config = UncalibratedPoseOverlayConfig(
-        sparse_flow=SparseFlowTrackerConfig(max_debug_frames=args.max_debug_frames),
-        output_debug_every_n_frames=args.output_debug_every_n_frames,
+        sparse_flow=SparseFlowTrackerConfig(
+            max_processing_frames=args.max_debug_frames,
+            write_debug_frames=False,
+        ),
+        write_debug_frames=False,
+        debug_every_n_frames=args.output_debug_every_n_frames,
     )
     result = UncalibratedPoseOverlayPipeline(config).run(args.video, baseline_output)
     evaluation = run_evaluation(

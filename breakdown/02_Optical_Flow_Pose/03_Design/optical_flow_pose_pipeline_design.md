@@ -48,7 +48,7 @@ flowchart TD
     J -->|annotated_frame| K[D1 Video Writer]
     J -->|frame_pose_results.json| L[D9 Verification]
     K -->|pose_overlay_uncalibrated.mp4| M[Artifacts]
-    L -->|metrics_summary.json + report.md| M
+    L -->|summary.json + per_frame.csv + evaluation_report.md| M
 ```
 
 ## 4. 建議檔案路徑

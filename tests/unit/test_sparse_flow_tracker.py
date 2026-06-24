@@ -44,6 +44,8 @@ def test_sparse_flow_tracker_tracks_synthetic_moving_features(tmp_path: Path) ->
     tracker = SparseFlowTracker(
         SparseFlowTrackerConfig(
             feature=ShiTomasiConfig(max_corners=100, quality_level=0.01, min_distance=4),
+            max_processing_frames=8,
+            write_debug_frames=True,
             max_debug_frames=8,
             output_debug_every_n_frames=2,
             min_valid_tracks=4,
@@ -67,7 +69,7 @@ def test_sparse_flow_tracker_tracks_synthetic_moving_features(tmp_path: Path) ->
 def test_flow_statistics_include_expected_fields(tmp_path: Path) -> None:
     video_path = tmp_path / "moving_squares.avi"
     _write_moving_squares_video(video_path)
-    result = SparseFlowTracker(SparseFlowTrackerConfig(max_debug_frames=3, min_valid_tracks=1)).track_video(video_path)
+    result = SparseFlowTracker(SparseFlowTrackerConfig(max_processing_frames=3, min_valid_tracks=1)).track_video(video_path)
 
     frame_payload = result.to_summary_dict()["frames"][0]
 
@@ -89,8 +91,30 @@ def test_sparse_flow_tracker_warns_when_features_are_too_few(tmp_path: Path) -> 
     video_path = tmp_path / "blank.avi"
     _write_blank_video(video_path)
 
-    result = SparseFlowTracker(SparseFlowTrackerConfig(max_debug_frames=4, min_valid_tracks=2)).track_video(video_path)
+    result = SparseFlowTracker(SparseFlowTrackerConfig(max_processing_frames=4, min_valid_tracks=2)).track_video(video_path)
 
     assert "too_few_feature_points" in result.warnings
     assert all(summary.valid_track_count == 0 for summary in result.frame_summaries)
 
+
+def test_debug_limit_does_not_limit_processing_and_debug_is_opt_in(tmp_path: Path) -> None:
+    video_path = tmp_path / "moving_squares.avi"
+    _write_moving_squares_video(video_path, frame_count=8)
+
+    normal = SparseFlowTracker(
+        SparseFlowTrackerConfig(max_debug_frames=1, min_valid_tracks=1)
+    ).track_video(video_path)
+    assert normal.processed_frame_count == 8
+    assert len(normal.frame_summaries) == 7
+    assert normal.debug_frames == []
+
+    debug = SparseFlowTracker(
+        SparseFlowTrackerConfig(
+            write_debug_frames=True,
+            max_debug_frames=2,
+            output_debug_every_n_frames=2,
+            min_valid_tracks=1,
+        )
+    ).track_video(video_path)
+    assert debug.processed_frame_count == 8
+    assert [frame.frame_index for frame in debug.debug_frames] == [2, 4]

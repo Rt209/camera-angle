@@ -9,9 +9,25 @@ import cv2
 import numpy as np
 
 from src.shared.errors import VideoOutputError
+from src.shared.output_contract import pose_metadata
 
 
 CSV_COLUMNS = [
+    "schema_version",
+    "pipeline",
+    "pose_type",
+    "sample_index",
+    "source_frame_index",
+    "timestamp_sec",
+    "yaw_deg",
+    "pitch_deg",
+    "roll_deg",
+    "unit",
+    "rotation_order",
+    "comparison_ready",
+    "line_count",
+    "horizon_candidate_count",
+    "vanishing_point_candidate_count",
     "frame_index",
     "time_sec",
     "yaw",
@@ -83,9 +99,16 @@ def write_frame_results_json(
     output_path: Path,
     video_metadata: dict[str, Any],
     sampling_config: dict[str, Any],
+    camera_intrinsics: dict[str, Any] | None = None,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
+        **pose_metadata("geometry"),
+        "source": video_metadata,
+        "sampling": sampling_config,
+        "intrinsics_calibrated": camera_intrinsics is not None,
+        "intrinsics": camera_intrinsics,
+        "warnings": sorted({warning for result in results for warning in result.to_dict().get("warnings", [])}),
         "video_metadata": video_metadata,
         "sampling_config": sampling_config,
         "frames": [result.to_dict() for result in results],
